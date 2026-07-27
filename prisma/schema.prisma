@@ -1,0 +1,681 @@
+// ExFlow — Export Logistics Operating System
+// Prisma schema: source of truth for the Postgres (Supabase) data model.
+// Raw SQL migrations (including RLS policies, which Prisma cannot express)
+// live under prisma/migrations and supabase/migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  EXPORT_MANAGER
+  DOCUMENTATION_EXECUTIVE
+  FACTORY_USER
+  TRANSPORT_COORDINATOR
+  ACCOUNTS
+  CUSTOMER
+}
+
+enum InvoiceStatus {
+  DRAFT
+  APPROVED
+  COMPLETED
+}
+
+enum DispatchStatus {
+  PENDING
+  DISPATCHED
+  REACHED_FACTORY
+  DELAY
+}
+
+enum ContainerSize {
+  FT20
+  FT40
+  FT40_HC
+}
+
+enum StuffingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum GateInStatus {
+  PENDING
+  COMPLETED
+}
+
+enum SIStatus {
+  DRAFT
+  SENT
+  CONFIRMED
+}
+
+enum BLStatus {
+  DRAFT
+  MISMATCH
+  FINAL
+}
+
+enum ShipmentStage {
+  INVOICE
+  DISPATCH
+  STUFFING
+  GATE_IN
+  SHIPPING_INSTRUCTION
+  BILL_OF_LADING
+  COMPLETED
+}
+
+enum DocumentCategory {
+  INVOICE
+  PACKING_LIST
+  BILL_OF_LADING
+  SHIPPING_INSTRUCTION
+  LR_COPY
+  GR_COPY
+  GATE_PASS
+  PHOTO
+  VIDEO
+  CERTIFICATE
+  STUFFING_REPORT
+  OTHER
+}
+
+enum DocumentEntityType {
+  SHIPMENT
+  INVOICE
+  DISPATCH
+  STUFFING
+  GATE_IN
+  SHIPPING_INSTRUCTION
+  BILL_OF_LADING
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum NotificationType {
+  TRUCK_DELAY
+  GATE_IN_DELAY
+  MISSING_DOCUMENTS
+  PENDING_SI
+  PENDING_BL
+  SEAL_MISSING
+  CONTAINER_DELAY
+  GENERAL
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy & identity
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users                User[]
+  customers            Customer[]
+  transporters         Transporter[]
+  shipments            Shipment[]
+  invoices             Invoice[]
+  truckDispatches      TruckDispatch[]
+  factoryStuffings     FactoryStuffing[]
+  gateIns              GateIn[]
+  shippingInstructions ShippingInstruction[]
+  billsOfLading        BillOfLading[]
+  documents            Document[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+
+  @@map("organizations")
+}
+
+/// Mirrors a Supabase auth.users row 1:1 via a shared primary key.
+model User {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String       @unique
+  name           String
+  role           Role
+  phone          String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  customerProfile   Customer?               @relation("CustomerPortalUser")
+  createdInvoices   Invoice[]               @relation("InvoiceCreatedBy")
+  createdDispatches TruckDispatch[]         @relation("DispatchCreatedBy")
+  createdStuffings  FactoryStuffing[]       @relation("StuffingCreatedBy")
+  createdGateIns    GateIn[]                @relation("GateInCreatedBy")
+  createdSIs        ShippingInstruction[]   @relation("SICreatedBy")
+  createdBLs        BillOfLading[]          @relation("BLCreatedBy")
+  uploadedDocuments Document[]              @relation("DocumentUploadedBy")
+  comments          ShipmentComment[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  timelineEvents    ShipmentTimelineEvent[]
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Master data
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  code           String?
+  address        String?
+  city           String?
+  country        String?
+  gstNumber      String?
+  contactPerson  String?
+  contactEmail   String?
+  contactPhone   String?
+  /// Linked Supabase user for customer-portal login, if this customer has portal access.
+  portalUserId   String?      @unique
+  portalUser     User?        @relation("CustomerPortalUser", fields: [portalUserId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  shipments Shipment[]
+  invoices  Invoice[]
+
+  @@index([organizationId])
+  @@map("customers")
+}
+
+model Transporter {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  contactPerson  String?
+  contactPhone   String?
+  contactEmail   String?
+  gstNumber      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  truckDispatches  TruckDispatch[]
+  factoryStuffings FactoryStuffing[]
+
+  @@index([organizationId])
+  @@map("transporters")
+}
+
+// ---------------------------------------------------------------------------
+// Shipment master record
+// ---------------------------------------------------------------------------
+
+/// The single digital record a shipment's Invoice → Dispatch → Stuffing →
+/// Gate-In → SI → BL pipeline all attach to. One shipment == one container /
+/// one export pipeline instance.
+model Shipment {
+  id             String        @id @default(uuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shipmentNumber String        @unique
+  customerId     String
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  currentStage   ShipmentStage @default(INVOICE)
+  isDelayed      Boolean       @default(false)
+  createdById    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  invoice             Invoice?
+  truckDispatches     TruckDispatch[]
+  factoryStuffing     FactoryStuffing?
+  gateIn              GateIn?
+  shippingInstruction ShippingInstruction?
+  billOfLading        BillOfLading?
+  documents           Document[]
+  comments            ShipmentComment[]
+  timelineEvents      ShipmentTimelineEvent[]
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@map("shipments")
+}
+
+model ShipmentTimelineEvent {
+  id          String        @id @default(uuid())
+  shipmentId  String
+  shipment    Shipment      @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  stage       ShipmentStage
+  title       String
+  description String?
+  occurredAt  DateTime      @default(now())
+  actorId     String?
+  actor       User?         @relation(fields: [actorId], references: [id])
+  createdAt   DateTime      @default(now())
+
+  @@index([shipmentId])
+  @@map("shipment_timeline_events")
+}
+
+model ShipmentComment {
+  id         String   @id @default(uuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([shipmentId])
+  @@map("shipment_comments")
+}
+
+// ---------------------------------------------------------------------------
+// Step 1 — Export Invoice
+// ---------------------------------------------------------------------------
+
+model Invoice {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shipmentId     String       @unique
+  shipment       Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  invoiceNumber  String
+  invoiceDate    DateTime
+  customerId     String
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  buyerName      String
+  buyerAddress   String?
+  poNumber       String?
+  material       String
+  quantity       Decimal       @db.Decimal(14, 3)
+  quantityUnit   String        @default("MT")
+  weight         Decimal       @db.Decimal(14, 3)
+  weightUnit     String        @default("KG")
+  numberOfBlocks Int?
+  hsnCode        String
+  unitPrice      Decimal       @db.Decimal(14, 2)
+  currency       String        @default("USD")
+  gstPercent     Decimal       @default(0) @db.Decimal(5, 2)
+  gstAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  totalAmount    Decimal       @db.Decimal(14, 2)
+  exportCountry  String
+  status         InvoiceStatus @default(DRAFT)
+  pdfUrl         String?
+
+  createdById String?
+  createdBy   User?    @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  versions  InvoiceVersion[]
+  documents Document[]
+
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId])
+  @@index([customerId])
+  @@map("invoices")
+}
+
+model InvoiceVersion {
+  id            String   @id @default(uuid())
+  invoiceId     String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  snapshot      Json
+  changeNote    String?
+  changedById   String?
+  createdAt     DateTime @default(now())
+
+  @@unique([invoiceId, versionNumber])
+  @@map("invoice_versions")
+}
+
+// ---------------------------------------------------------------------------
+// Step 2 — Truck Dispatch
+// ---------------------------------------------------------------------------
+
+model TruckDispatch {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shipmentId     String
+  shipment       Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  truckNumber            String
+  driverName             String
+  driverMobile           String
+  transporterId          String
+  transporter            Transporter    @relation(fields: [transporterId], references: [id])
+  material               String
+  referenceNumber        String?
+  numberOfWeights        Decimal?       @db.Decimal(14, 3)
+  numberOfBlocks         Int?
+  dispatchDate           DateTime
+  expectedFactoryArrival DateTime
+  actualFactoryArrival   DateTime?
+  status                 DispatchStatus @default(PENDING)
+
+  createdById String?
+  createdBy   User?    @relation("DispatchCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  factoryStuffing   FactoryStuffing? @relation(fields: [factoryStuffingId], references: [id])
+  factoryStuffingId String?
+  documents         Document[]
+
+  @@index([organizationId])
+  @@index([shipmentId])
+  @@index([transporterId])
+  @@map("truck_dispatches")
+}
+
+// ---------------------------------------------------------------------------
+// Step 3 — Factory Stuffing
+// ---------------------------------------------------------------------------
+
+model FactoryStuffing {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shipmentId     String       @unique
+  shipment       Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  containerNumber   String
+  containerSize     ContainerSize
+  sealNumber        String?
+  contactNumber     String?
+  transporterId     String?
+  transporter       Transporter?  @relation(fields: [transporterId], references: [id])
+  pol               String
+  pod               String
+  numberOfBoxes     Int?
+  grossWeight       Decimal?      @db.Decimal(14, 3)
+  netWeight         Decimal?      @db.Decimal(14, 3)
+  stuffingStartTime DateTime?
+  stuffingEndTime   DateTime?
+
+  checklistContainerClean    Boolean @default(false)
+  checklistContainerDamage   Boolean @default(false)
+  checklistSealApplied       Boolean @default(false)
+  checklistDocumentsUploaded Boolean @default(false)
+
+  status    StuffingStatus @default(SCHEDULED)
+  reportUrl String?
+
+  createdById String?
+  createdBy   User?    @relation("StuffingCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  truckDispatches TruckDispatch[]
+  gateIn          GateIn?
+  documents       Document[]
+
+  @@index([organizationId])
+  @@map("factory_stuffings")
+}
+
+// ---------------------------------------------------------------------------
+// Step 4 — Gate In
+// ---------------------------------------------------------------------------
+
+model GateIn {
+  id                String          @id @default(uuid())
+  organizationId    String
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shipmentId        String          @unique
+  shipment          Shipment        @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  factoryStuffingId String          @unique
+  factoryStuffing   FactoryStuffing @relation(fields: [factoryStuffingId], references: [id], onDelete: Cascade)
+
+  containerNumber String
+  gateInDate      DateTime
+  terminal        String
+  yard            String?
+  vehicleNumber   String?
+  form13Updated   Boolean      @default(false)
+  gatePass        String?
+  eirNumber       String?
+  remarks         String?
+  status          GateInStatus @default(PENDING)
+
+  createdById String?
+  createdBy   User?    @relation("GateInCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  documents Document[]
+
+  @@index([organizationId])
+  @@map("gate_ins")
+}
+
+// ---------------------------------------------------------------------------
+// Step 5 — Shipping Instruction
+// ---------------------------------------------------------------------------
+
+model ShippingInstruction {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shipmentId     String       @unique
+  shipment       Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  consignorName      String
+  consignorAddress   String?
+  consigneeName      String
+  consigneeAddress   String?
+  notifyPartyName    String?
+  notifyPartyAddress String?
+  pol                String
+  pod                String
+  commodity          String
+  hsCode             String?
+  packageCount       Int?
+  weight             Decimal?  @db.Decimal(14, 3)
+  marks              String?
+  containerNumber    String?
+  sealNumber         String?
+  freightTerms       String?
+  incoterms          String?
+  shippingLine       String?
+  voyage             String?
+  vessel             String?
+  status             SIStatus  @default(DRAFT)
+  pdfUrl             String?
+  sentAt             DateTime?
+
+  createdById String?
+  createdBy   User?    @relation("SICreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  billOfLading BillOfLading?
+  documents    Document[]
+
+  @@index([organizationId])
+  @@map("shipping_instructions")
+}
+
+// ---------------------------------------------------------------------------
+// Step 6 — Bill of Lading
+// ---------------------------------------------------------------------------
+
+model BillOfLading {
+  id                    String              @id @default(uuid())
+  organizationId        String
+  organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shipmentId            String              @unique
+  shipment              Shipment            @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shippingInstructionId String              @unique
+  shippingInstruction   ShippingInstruction @relation(fields: [shippingInstructionId], references: [id], onDelete: Cascade)
+
+  blNumber           String?
+  blDate             DateTime?
+  consignorName      String
+  consignorAddress   String?
+  consigneeName      String
+  consigneeAddress   String?
+  notifyPartyName    String?
+  notifyPartyAddress String?
+  pol                String
+  pod                String
+  vessel             String?
+  voyage             String?
+  containerNumber    String?
+  sealNumber         String?
+  commodity          String
+  packageCount       Int?
+  weight             Decimal?  @db.Decimal(14, 3)
+  freightTerms       String?
+  status             BLStatus  @default(DRAFT)
+  mismatchNotes      Json?
+  pdfUrl             String?
+
+  createdById String?
+  createdBy   User?    @relation("BLCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  revisions BLRevision[]
+  documents Document[]
+
+  @@index([organizationId])
+  @@map("bills_of_lading")
+}
+
+model BLRevision {
+  id             String       @id @default(uuid())
+  billOfLadingId String
+  billOfLading   BillOfLading @relation(fields: [billOfLadingId], references: [id], onDelete: Cascade)
+  revisionNumber Int
+  snapshot       Json
+  changeNote     String?
+  changedById    String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([billOfLadingId, revisionNumber])
+  @@map("bl_revisions")
+}
+
+// ---------------------------------------------------------------------------
+// Documents (shared across every module)
+// ---------------------------------------------------------------------------
+
+model Document {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shipmentId     String?
+  shipment       Shipment?    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  entityType        String
+  category          DocumentCategory
+  fileName          String
+  fileUrl           String
+  fileType          String?
+  fileSizeBytes     Int?
+  ocrText           String?
+  version           Int              @default(1)
+  previousVersionId String?          @unique
+  previousVersion   Document?        @relation("DocumentVersionHistory", fields: [previousVersionId], references: [id])
+  nextVersion       Document?        @relation("DocumentVersionHistory")
+
+  uploadedById String?
+  uploadedBy   User?    @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  invoiceId             String?
+  invoice               Invoice?             @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  truckDispatchId       String?
+  truckDispatch         TruckDispatch?       @relation(fields: [truckDispatchId], references: [id], onDelete: Cascade)
+  factoryStuffingId     String?
+  factoryStuffing       FactoryStuffing?     @relation(fields: [factoryStuffingId], references: [id], onDelete: Cascade)
+  gateInId              String?
+  gateIn                GateIn?              @relation(fields: [gateInId], references: [id], onDelete: Cascade)
+  shippingInstructionId String?
+  shippingInstruction   ShippingInstruction? @relation(fields: [shippingInstructionId], references: [id], onDelete: Cascade)
+  billOfLadingId        String?
+  billOfLading          BillOfLading?        @relation(fields: [billOfLadingId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([shipmentId])
+  @@map("documents")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id             String              @id @default(uuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           NotificationType
+  channel        NotificationChannel @default(IN_APP)
+  title          String
+  body           String?
+  entityType     String?
+  entityId       String?
+  isRead         Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+
+  @@index([organizationId])
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Audit log (generic, polymorphic — technical change history)
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entityType     String
+  entityId       String
+  action         AuditAction
+  changes        Json?
+  actorId        String?
+  actor          User?        @relation(fields: [actorId], references: [id])
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
