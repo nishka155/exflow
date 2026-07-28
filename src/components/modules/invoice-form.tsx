@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { Customer } from "@prisma/client";
 import type { ActionResult } from "@/lib/actions/invoices";
 import type { SerializedInvoice } from "@/lib/serializers/invoice";
+import { suggestHsnCode } from "@/lib/ai/field-suggestions";
 
 type InvoiceFormAction = (
   prev: ActionResult,
@@ -39,6 +40,10 @@ export function InvoiceForm({
   const [buyerName, setBuyerName] = React.useState(invoice?.buyerName ?? "");
   const [buyerAddress, setBuyerAddress] = React.useState(invoice?.buyerAddress ?? "");
   const [exportCountry, setExportCountry] = React.useState(invoice?.exportCountry ?? "");
+  const [material, setMaterial] = React.useState(invoice?.material ?? "");
+  const [hsnCode, setHsnCode] = React.useState(invoice?.hsnCode ?? "");
+
+  const hsnSuggestion = React.useMemo(() => suggestHsnCode(material), [material]);
 
   function handleCustomerChange(id: string | null) {
     if (!id) return;
@@ -144,13 +149,30 @@ export function InvoiceForm({
               id="material"
               name="material"
               required
-              defaultValue={invoice?.material}
+              value={material}
+              onChange={(e) => setMaterial(e.target.value)}
               placeholder="Granite Slabs - Alaska White"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="hsnCode">HSN Code</Label>
-            <Input id="hsnCode" name="hsnCode" required defaultValue={invoice?.hsnCode} />
+            <Input
+              id="hsnCode"
+              name="hsnCode"
+              required
+              value={hsnCode}
+              onChange={(e) => setHsnCode(e.target.value)}
+            />
+            {hsnSuggestion && hsnCode !== hsnSuggestion.code && (
+              <button
+                type="button"
+                onClick={() => setHsnCode(hsnSuggestion.code)}
+                className="text-left text-xs text-muted-foreground hover:text-brand"
+              >
+                Suggested: <span className="font-medium">{hsnSuggestion.code}</span> (
+                {hsnSuggestion.label}) — click to use
+              </button>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="numberOfBlocks">Number of Blocks</Label>

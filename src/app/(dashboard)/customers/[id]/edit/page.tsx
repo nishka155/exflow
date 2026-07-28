@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { CustomerForm } from "@/components/modules/customer-form";
+import { PortalAccessCard } from "@/components/modules/portal-access-card";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { updateCustomerAction } from "@/lib/actions/customers";
 import { prisma } from "@/lib/prisma";
@@ -16,13 +17,15 @@ export default async function EditCustomerPage({
 
   const customer = await prisma.customer.findFirst({
     where: { id, organizationId: user.organizationId },
+    include: { portalUser: { select: { email: true } } },
   });
   if (!customer) notFound();
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader title={`Edit ${customer.name}`} />
       <CustomerForm customer={customer} action={updateCustomerAction.bind(null, customer.id)} />
+      <PortalAccessCard customerId={customer.id} portalUserEmail={customer.portalUser?.email ?? null} />
     </div>
   );
 }

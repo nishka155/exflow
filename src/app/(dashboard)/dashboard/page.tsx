@@ -20,6 +20,8 @@ import { ExportCountryChart } from "@/components/dashboard/export-country-chart"
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { getDashboardData } from "@/lib/queries/dashboard";
+import { getAtRiskDispatches } from "@/lib/ai/delay-risk";
+import { AtRiskDispatchesCard } from "@/components/dashboard/at-risk-dispatches-card";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
@@ -41,6 +43,8 @@ export default async function DashboardPage() {
     orderBy: { createdAt: "desc" },
     take: 5,
   });
+
+  const atRiskDispatches = await getAtRiskDispatches(user.organizationId);
 
   return (
     <div>
@@ -135,6 +139,10 @@ export default async function DashboardPage() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mt-6">
+        <AtRiskDispatchesCard dispatches={atRiskDispatches} />
       </div>
     </div>
   );

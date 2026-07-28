@@ -17,6 +17,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import type { Transporter, Shipment, Customer, Invoice } from "@prisma/client";
 import { createStuffingAction, type ActionResult } from "@/lib/actions/stuffing";
+import { estimateTransitDays } from "@/lib/ai/eta-estimator";
 
 type ShipmentOption = Shipment & { customer: Customer; invoice: Invoice | null };
 
@@ -40,6 +41,10 @@ export function StuffingForm({
   );
   const [shipmentId, setShipmentId] = React.useState("");
   const [containerSize, setContainerSize] = React.useState("FT40");
+  const [pol, setPol] = React.useState("");
+  const [pod, setPod] = React.useState("");
+
+  const estimatedTransitDays = React.useMemo(() => estimateTransitDays(pol, pod), [pol, pod]);
   const [transporterId, setTransporterId] = React.useState("");
 
   return (
@@ -121,11 +126,23 @@ export function StuffingForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="pol">POL (Port of Loading)</Label>
-            <Input id="pol" name="pol" required placeholder="Mundra, India" />
+            <Input
+              id="pol"
+              name="pol"
+              required
+              value={pol}
+              onChange={(e) => setPol(e.target.value)}
+              placeholder="Mundra, India"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="pod">POD (Port of Discharge)</Label>
-            <Input id="pod" name="pod" required />
+            <Input id="pod" name="pod" required value={pod} onChange={(e) => setPod(e.target.value)} />
+            {estimatedTransitDays && (
+              <p className="text-xs text-muted-foreground">
+                Estimated transit: ~{estimatedTransitDays} days
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="numberOfBoxes">Number of Boxes</Label>

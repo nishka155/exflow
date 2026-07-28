@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { History } from "lucide-react";
+import { History, AlertTriangle } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { getInvoiceById } from "@/lib/queries/invoices";
 import { uploadInvoiceDocumentAction } from "@/lib/actions/invoices";
+import { findPossibleDuplicateInvoices } from "@/lib/ai/duplicate-detection";
 import { INVOICE_STATUS_CONFIG, type InvoiceStatus } from "@/lib/constants/statuses";
 
 const currencyFormatter = (currency: string) =>
@@ -29,6 +30,7 @@ export default async function InvoiceDetailPage({
   if (!invoice) notFound();
 
   const uploadAction = uploadInvoiceDocumentAction.bind(null, invoice.id);
+  const duplicates = await findPossibleDuplicateInvoices(invoice.id);
 
   return (
     <div>
@@ -39,6 +41,33 @@ export default async function InvoiceDetailPage({
           <StatusBadge config={INVOICE_STATUS_CONFIG[invoice.status as InvoiceStatus]} />
         }
       />
+
+      {duplicates.length > 0 && (
+        <Card className="mb-6 border-warning/40 bg-warning/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm font-medium text-warning-foreground">
+              <AlertTriangle className="size-4 text-warning" />
+              Possible duplicate invoice
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <p className="text-sm text-muted-foreground">
+              Similar invoices for this customer and material were found within a week of this
+              one:
+            </p>
+            {duplicates.map((d) => (
+              <Link
+                key={d.id}
+                href={`/invoices/${d.id}`}
+                className="block text-sm text-brand hover:underline"
+              >
+                {d.invoiceNumber} · {new Date(d.invoiceDate).toLocaleDateString()} ·{" "}
+                {currencyFormatter(invoice.currency).format(Number(d.totalAmount))}
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mb-6">
         <InvoiceActions
