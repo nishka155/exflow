@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -13,15 +14,17 @@ export function StatCard({
   value,
   icon: Icon,
   tone = "neutral",
+  href,
   className,
 }: {
   label: string;
   value: string | number;
   icon?: LucideIcon;
   tone?: "neutral" | "warning" | "destructive";
+  href?: string;
   className?: string;
 }) {
-  return (
+  const card = (
     <Card
       className={cn(
         "transition-shadow hover:shadow-sm",
@@ -55,5 +58,13 @@ export function StatCard({
         )}
       </CardContent>
     </Card>
+  );
+
+  if (!href) return card;
+
+  return (
+    <Link href={href} className="block rounded-xl">
+      {card}
+    </Link>
   );
 }

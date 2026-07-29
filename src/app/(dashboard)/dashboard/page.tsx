@@ -54,23 +54,55 @@ export default async function DashboardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <StatCard label="Today's Dispatches" value={kpis.todaysDispatches} icon={Truck} />
-        <StatCard label="Today's Stuffing" value={kpis.todaysStuffing} icon={Container} />
-        <StatCard label="Containers Waiting" value={kpis.containersWaiting} icon={Clock} />
-        <StatCard label="Gate In Pending" value={kpis.gateInPending} icon={DoorOpen} />
-        <StatCard label="Pending SI" value={kpis.pendingSI} icon={Send} />
-        <StatCard label="Pending BL" value={kpis.pendingBL} icon={Ship} />
+        <StatCard
+          label="Today's Dispatches"
+          value={kpis.todaysDispatches}
+          icon={Truck}
+          href="/dispatches"
+        />
+        <StatCard
+          label="Today's Stuffing"
+          value={kpis.todaysStuffing}
+          icon={Container}
+          href="/stuffing"
+        />
+        <StatCard
+          label="Containers Waiting"
+          value={kpis.containersWaiting}
+          icon={Clock}
+          href="/stuffing"
+        />
+        <StatCard
+          label="Gate In Pending"
+          value={kpis.gateInPending}
+          icon={DoorOpen}
+          href="/gate-in"
+        />
+        <StatCard
+          label="Pending SI"
+          value={kpis.pendingSI}
+          icon={Send}
+          href="/shipping-instructions"
+        />
+        <StatCard label="Pending BL" value={kpis.pendingBL} icon={Ship} href="/bills-of-lading" />
         <StatCard
           label="Delayed Trucks"
           value={kpis.delayedTrucks}
           icon={AlertTriangle}
           tone={kpis.delayedTrucks > 0 ? "destructive" : "neutral"}
+          href="/dispatches"
         />
-        <StatCard label="Shipments This Month" value={kpis.shipmentsThisMonth} icon={Boxes} />
+        <StatCard
+          label="Shipments This Month"
+          value={kpis.shipmentsThisMonth}
+          icon={Boxes}
+          href="/shipments"
+        />
         <StatCard
           label="Revenue (Completed)"
           value={currencyFormatter.format(kpis.revenue)}
           icon={DollarSign}
+          href="/invoices"
         />
       </div>
 
