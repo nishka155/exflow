@@ -1,10 +1,15 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
+import { AuthError } from "next-auth";
+
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { signIn, signOut } from "@/lib/auth/auth";
+import { generateToken, hashToken } from "@/lib/auth/tokens";
+import { sendMail } from "@/lib/email/resend";
 import {
   signUpSchema,
   signInSchema,
@@ -31,6 +36,11 @@ export async function signUpAction(
   }
   const { organizationName, name, email, password } = parsed.data;
 
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    return { error: "An account with that email already exists" };
+  }
+
   const baseSlug = slugify(organizationName) || "company";
   let slug = baseSlug;
   let attempt = 0;
@@ -43,34 +53,34 @@ export async function signUpAction(
     data: { name: organizationName, slug },
   });
 
-  const admin = createSupabaseAdminClient();
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      organization_id: organization.id,
-      name,
-      role: "ADMIN",
-    },
-  });
-
-  if (createError || !created.user) {
-    console.error("[signUpAction] admin.createUser failed:", createError);
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+    await prisma.user.create({
+      data: {
+        id: randomUUID(),
+        organizationId: organization.id,
+        email,
+        name,
+        role: "ADMIN",
+        passwordHash,
+      },
+    });
+  } catch (err) {
+    console.error("[signUpAction] user creation failed:", err);
     await prisma.organization.delete({ where: { id: organization.id } });
-    return { error: createError?.message ?? "Could not create account" };
+    return { error: "Could not create account" };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  if (signInError) {
-    return { error: signInError.message };
+  try {
+    await signIn("credentials", { email, password, redirectTo: "/dashboard" });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { error: "Account created, but automatic sign-in failed — please log in." };
+    }
+    throw error;
   }
 
-  redirect("/dashboard");
+  return {};
 }
 
 export async function signInAction(
@@ -85,19 +95,20 @@ export async function signInAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) {
-    return { error: "Incorrect email or password" };
+  try {
+    await signIn("credentials", { ...parsed.data, redirectTo: "/dashboard" });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { error: "Incorrect email or password" };
+    }
+    throw error;
   }
 
-  redirect("/dashboard");
+  return {};
 }
 
 export async function signOutAction() {
-  const supabase = await createSupabaseServerClient();
-  await supabase.auth.signOut();
-  redirect("/login");
+  await signOut({ redirectTo: "/login" });
 }
 
 export async function forgotPasswordAction(
@@ -111,11 +122,25 @@ export async function forgotPasswordAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${appUrl}/auth/callback?next=/reset-password`,
-  });
+  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  if (user) {
+    const { token, tokenHash } = generateToken();
+    await prisma.authToken.create({
+      data: {
+        userId: user.id,
+        type: "PASSWORD_RESET",
+        tokenHash,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    await sendMail({
+      to: user.email,
+      subject: "Reset your ExFlow password",
+      html: `<p>Click the link below to reset your password. This link expires in 1 hour.</p><p><a href="${appUrl}/reset-password?token=${token}">Reset password</a></p>`,
+    });
+  }
 
   // Always report success so we don't leak which emails have accounts.
   return { success: true };
@@ -125,6 +150,11 @@ export async function resetPasswordAction(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
+  const token = formData.get("token");
+  if (typeof token !== "string" || !token) {
+    return { error: "Invalid or missing reset link" };
+  }
+
   const parsed = resetPasswordSchema.safeParse({
     password: formData.get("password"),
   });
@@ -132,11 +162,66 @@ export async function resetPasswordAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
-  if (error) {
-    return { error: error.message };
+  const record = await prisma.authToken.findUnique({ where: { tokenHash: hashToken(token) } });
+  if (
+    !record ||
+    record.type !== "PASSWORD_RESET" ||
+    record.usedAt ||
+    record.expiresAt < new Date()
+  ) {
+    return { error: "This reset link is invalid or has expired." };
   }
 
-  redirect("/dashboard");
+  const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: record.userId }, data: { passwordHash } }),
+    prisma.authToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+  ]);
+
+  redirect("/login?reset=success");
+}
+
+export async function acceptInviteAction(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const token = formData.get("token");
+  if (typeof token !== "string" || !token) {
+    return { error: "Invalid or missing invite link" };
+  }
+
+  const parsed = resetPasswordSchema.safeParse({
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const record = await prisma.authToken.findUnique({ where: { tokenHash: hashToken(token) } });
+  if (!record || record.type !== "INVITE" || record.usedAt || record.expiresAt < new Date()) {
+    return { error: "This invite link is invalid or has expired." };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: record.userId } });
+  if (!user) {
+    return { error: "This invite link is invalid or has expired." };
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: record.userId }, data: { passwordHash } }),
+    prisma.authToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+  ]);
+
+  const redirectTo = user.role === "CUSTOMER" ? "/portal" : "/dashboard";
+  try {
+    await signIn("credentials", { email: user.email, password: parsed.data.password, redirectTo });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      redirect("/login");
+    }
+    throw error;
+  }
+
+  return {};
 }

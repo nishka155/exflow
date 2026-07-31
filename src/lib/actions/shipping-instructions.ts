@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/require-user";
-import { uploadDocumentFile } from "@/lib/supabase/storage";
+import { uploadDocumentFile } from "@/lib/storage/s3";
 import { generateSiPdf } from "@/lib/pdf/generate-si-pdf";
 import { shippingInstructionSchema } from "@/lib/validations/shipping-instruction";
 

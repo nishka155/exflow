@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useActionState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -15,27 +15,51 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Customer } from "@prisma/client";
-import type { ActionResult } from "@/lib/actions/invoices";
-import type { SerializedInvoice } from "@/lib/serializers/invoice";
+import { api, ApiError } from "@/lib/api/client";
 import { suggestHsnCode } from "@/lib/ai/field-suggestions";
 
-type InvoiceFormAction = (
-  prev: ActionResult,
-  formData: FormData
-) => Promise<ActionResult>;
+interface Customer {
+  id: string;
+  name: string;
+  country: string | null;
+  address: string | null;
+  city: string | null;
+}
+
+interface InvoiceRecord {
+  id: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  customerId: string;
+  buyerName: string;
+  buyerAddress: string | null;
+  poNumber: string | null;
+  material: string;
+  quantity: number;
+  quantityUnit: string;
+  weight: number;
+  weightUnit: string;
+  numberOfBlocks: number | null;
+  hsnCode: string;
+  unitPrice: number;
+  currency: string;
+  gstPercent: number;
+  exportCountry: string;
+}
 
 export function InvoiceForm({
   customers,
   invoice,
-  action,
+  mode,
 }: {
   customers: Customer[];
-  invoice?: SerializedInvoice;
-  action: InvoiceFormAction;
+  invoice?: InvoiceRecord;
+  mode: "create" | "edit";
 }) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState<ActionResult, FormData>(action, {});
+  const queryClient = useQueryClient();
+  const [error, setError] = React.useState<string | null>(null);
+
   const [customerId, setCustomerId] = React.useState(invoice?.customerId ?? "");
   const [buyerName, setBuyerName] = React.useState(invoice?.buyerName ?? "");
   const [buyerAddress, setBuyerAddress] = React.useState(invoice?.buyerAddress ?? "");
@@ -56,10 +80,52 @@ export function InvoiceForm({
     }
   }
 
+  const mutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      if (mode === "create") {
+        return api.post<InvoiceRecord>("/api/invoices", payload);
+      }
+      return api.put<InvoiceRecord>(`/api/invoices/${invoice!.id}`, payload);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice", data.id] });
+      router.push(`/invoices/${data.id}`);
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : "Something went wrong");
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const formData = new FormData(e.currentTarget);
+    mutation.mutate({
+      invoiceNumber: formData.get("invoiceNumber"),
+      invoiceDate: formData.get("invoiceDate"),
+      customerId,
+      buyerName,
+      buyerAddress: buyerAddress || undefined,
+      poNumber: formData.get("poNumber") || undefined,
+      material,
+      quantity: formData.get("quantity"),
+      quantityUnit: formData.get("quantityUnit") || "MT",
+      weight: formData.get("weight"),
+      weightUnit: formData.get("weightUnit") || "KG",
+      numberOfBlocks: formData.get("numberOfBlocks") || undefined,
+      hsnCode,
+      unitPrice: formData.get("unitPrice"),
+      currency: formData.get("currency") || "USD",
+      gstPercent: formData.get("gstPercent") || 0,
+      exportCountry,
+    });
+  }
+
   const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardContent className="grid gap-4 sm:grid-cols-2 py-1">
           <div className="space-y-2">
@@ -79,14 +145,11 @@ export function InvoiceForm({
               name="invoiceDate"
               type="date"
               required
-              defaultValue={
-                invoice ? new Date(invoice.invoiceDate).toISOString().slice(0, 10) : todayStr
-              }
+              defaultValue={invoice ? invoice.invoiceDate.slice(0, 10) : todayStr}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="customerId">Customer</Label>
-            <input type="hidden" name="customerId" value={customerId} />
             <Select value={customerId} onValueChange={handleCustomerChange}>
               <SelectTrigger id="customerId" className="w-full">
                 <SelectValue placeholder="Select a customer">
@@ -192,7 +255,7 @@ export function InvoiceForm({
               type="number"
               step="0.01"
               required
-              defaultValue={invoice ? Number(invoice.quantity) : undefined}
+              defaultValue={invoice?.quantity}
             />
           </div>
           <div className="space-y-2">
@@ -208,7 +271,7 @@ export function InvoiceForm({
               type="number"
               step="0.01"
               required
-              defaultValue={invoice ? Number(invoice.weight) : undefined}
+              defaultValue={invoice?.weight}
             />
           </div>
           <div className="space-y-2">
@@ -228,7 +291,7 @@ export function InvoiceForm({
               type="number"
               step="0.01"
               required
-              defaultValue={invoice ? Number(invoice.unitPrice) : undefined}
+              defaultValue={invoice?.unitPrice}
             />
           </div>
           <div className="space-y-2">
@@ -242,17 +305,17 @@ export function InvoiceForm({
               name="gstPercent"
               type="number"
               step="0.01"
-              defaultValue={invoice ? Number(invoice.gstPercent) : 0}
+              defaultValue={invoice ? invoice.gstPercent : 0}
             />
           </div>
         </CardContent>
       </Card>
 
-      {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex items-center gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : invoice ? "Save Changes" : "Create Invoice"}
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? "Saving…" : invoice ? "Save Changes" : "Create Invoice"}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel

@@ -1,7 +1,7 @@
 import "server-only";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
-import { uploadDocumentFile } from "@/lib/supabase/storage";
+import { uploadDocumentFile } from "@/lib/storage/s3";
 import { InvoiceDocument } from "@/lib/pdf/invoice-document";
 
 export async function generateInvoicePdf(invoiceId: string, organizationId: string) {

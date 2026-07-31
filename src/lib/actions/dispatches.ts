@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/require-user";
-import { uploadDocumentFile } from "@/lib/supabase/storage";
+import { uploadDocumentFile } from "@/lib/storage/s3";
 import { dispatchSchema } from "@/lib/validations/dispatch";
 import { notifyRoles } from "@/lib/actions/notifications";
 import type { DispatchStatus } from "@/lib/constants/statuses";

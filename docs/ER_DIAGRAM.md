@@ -149,10 +149,11 @@ erDiagram
 - `Document` is a single polymorphic table (`shipmentId` + optional per-module FK) so
   uploads, OCR text, and version chains work the same way across every module instead of
   duplicating an uploads table six times.
-- `Customer.portalUserId` is the only link between the master-data side and Supabase
-  Auth users for the customer portal; everyone else authenticates as a `User` scoped to
-  an `Organization`.
-- Multi-tenancy is enforced twice: application-layer (`organizationId` checks in every
-  Prisma query, done in Server Actions) and database-layer (Postgres RLS policies in
-  `prisma/migrations/0002_auth_rls`) as defense-in-depth for any direct Supabase client
-  access.
+- `Customer.portalUserId` is the only link between the master-data side and the
+  customer-portal login for that customer; everyone else authenticates as a `User`
+  scoped to an `Organization`.
+- Multi-tenancy is enforced application-layer only: every Prisma query in Server Actions
+  checks `organizationId` explicitly. (An earlier Supabase-hosted version of this schema
+  also had database-layer RLS policies in `prisma/migrations/0002_auth_rls` as
+  defense-in-depth; those are Supabase-specific and are not applied on the current,
+  non-Supabase Postgres setup.)

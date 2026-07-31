@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { auth } from "@/lib/auth/auth";
 import type { Role } from "@/lib/constants/roles";
 
 export interface CurrentUser {
@@ -11,15 +11,11 @@ export interface CurrentUser {
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await auth();
+  if (!session?.user?.id) return null;
 
-  if (!user) return null;
-
-  const profile = await prisma.user.findUnique({ where: { id: user.id } });
-  if (!profile) return null;
+  const profile = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!profile || !profile.isActive) return null;
 
   return {
     id: profile.id,

@@ -1,7 +1,7 @@
 import "server-only";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
-import { uploadDocumentFile } from "@/lib/supabase/storage";
+import { uploadDocumentFile } from "@/lib/storage/s3";
 import { StuffingReportDocument } from "@/lib/pdf/stuffing-document";
 
 export async function generateStuffingReport(stuffingId: string, organizationId: string) {

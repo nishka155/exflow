@@ -1,48 +1,96 @@
-import { notFound, redirect } from "next/navigation";
+"use client";
+
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { History, AlertTriangle } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { History, AlertTriangle, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { DocumentList } from "@/components/shared/document-list";
 import { DocumentUploader } from "@/components/shared/document-uploader";
 import { InvoiceActions } from "@/components/modules/invoice-actions";
+import { AuthGuard } from "@/components/auth/auth-guard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { getInvoiceById } from "@/lib/queries/invoices";
-import { uploadInvoiceDocumentAction } from "@/lib/actions/invoices";
-import { findPossibleDuplicateInvoices } from "@/lib/ai/duplicate-detection";
+import { api, ApiError } from "@/lib/api/client";
 import { INVOICE_STATUS_CONFIG, type InvoiceStatus } from "@/lib/constants/statuses";
+import type { Document } from "@prisma/client";
 
 const currencyFormatter = (currency: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 2 });
 
-export default async function InvoiceDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface InvoiceDetail {
+  id: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  buyerName: string;
+  poNumber: string | null;
+  exportCountry: string;
+  material: string;
+  hsnCode: string;
+  quantity: string;
+  quantityUnit: string;
+  weight: string;
+  weightUnit: string;
+  numberOfBlocks: number | null;
+  unitPrice: string;
+  gstPercent: string;
+  totalAmount: string;
+  currency: string;
+  status: string;
+  pdfUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  shipmentId: string;
+  customer: { name: string };
+  shipment: { shipmentNumber: string };
+  createdBy: { name: string } | null;
+  versions: { id: string; versionNumber: number; changeNote: string | null; createdAt: string }[];
+  documents: Document[];
+  duplicates: { id: string; invoiceNumber: string; invoiceDate: string; totalAmount: string }[];
+}
 
-  const invoice = await getInvoiceById(id, user.organizationId);
-  if (!invoice) notFound();
+function InvoiceDetailPageContent() {
+  const params = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
 
-  const uploadAction = uploadInvoiceDocumentAction.bind(null, invoice.id);
-  const duplicates = await findPossibleDuplicateInvoices(invoice.id);
+  const { data: invoice, isLoading, error } = useQuery({
+    queryKey: ["invoice", params.id],
+    queryFn: () => api.get<InvoiceDetail>(`/api/invoices/${params.id}`),
+  });
+
+  async function uploadDocument(formData: FormData) {
+    try {
+      await api.post(`/api/invoices/${params.id}/documents`, formData);
+      queryClient.invalidateQueries({ queryKey: ["invoice", params.id] });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Upload failed");
+      throw err;
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error || !invoice) {
+    return <p className="py-16 text-center text-sm text-destructive">Invoice not found.</p>;
+  }
 
   return (
     <div>
       <PageHeader
         title={invoice.invoiceNumber}
         description={`Shipment ${invoice.shipment.shipmentNumber}`}
-        actions={
-          <StatusBadge config={INVOICE_STATUS_CONFIG[invoice.status as InvoiceStatus]} />
-        }
+        actions={<StatusBadge config={INVOICE_STATUS_CONFIG[invoice.status as InvoiceStatus]} />}
       />
 
-      {duplicates.length > 0 && (
+      {invoice.duplicates.length > 0 && (
         <Card className="mb-6 border-warning/40 bg-warning/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm font-medium text-warning-foreground">
@@ -55,7 +103,7 @@ export default async function InvoiceDetailPage({
               Similar invoices for this customer and material were found within a week of this
               one:
             </p>
-            {duplicates.map((d) => (
+            {invoice.duplicates.map((d) => (
               <Link
                 key={d.id}
                 href={`/invoices/${d.id}`}
@@ -89,10 +137,7 @@ export default async function InvoiceDetailPage({
             <Field label="Export Country" value={invoice.exportCountry} />
             <Field label="Material" value={invoice.material} />
             <Field label="HSN Code" value={invoice.hsnCode} />
-            <Field
-              label="Quantity"
-              value={`${Number(invoice.quantity)} ${invoice.quantityUnit}`}
-            />
+            <Field label="Quantity" value={`${Number(invoice.quantity)} ${invoice.quantityUnit}`} />
             <Field label="Weight" value={`${Number(invoice.weight)} ${invoice.weightUnit}`} />
             <Field label="Number of Blocks" value={invoice.numberOfBlocks ?? "—"} />
             <Field
@@ -137,7 +182,7 @@ export default async function InvoiceDetailPage({
             <CardTitle className="text-sm font-medium">Documents</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <DocumentUploader action={uploadAction} />
+            <DocumentUploader action={uploadDocument} />
             <DocumentList documents={invoice.documents} />
           </CardContent>
         </Card>
@@ -187,5 +232,13 @@ function Field({
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className={emphasize ? "text-base font-semibold" : "text-sm"}>{value}</p>
     </div>
+  );
+}
+
+export default function InvoiceDetailPage() {
+  return (
+    <AuthGuard>
+      <InvoiceDetailPageContent />
+    </AuthGuard>
   );
 }

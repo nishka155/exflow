@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/require-user";
 import { generateNextShipmentNumber } from "@/lib/queries/shipments";
 import { generateInvoicePdf } from "@/lib/pdf/generate-invoice-pdf";
-import { uploadDocumentFile } from "@/lib/supabase/storage";
+import { uploadDocumentFile } from "@/lib/storage/s3";
 import { invoiceSchema, computeInvoiceTotals } from "@/lib/validations/invoice";
 import type { InvoiceStatus } from "@/lib/constants/statuses";
 

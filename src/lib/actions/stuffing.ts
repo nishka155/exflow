@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/require-user";
-import { uploadDocumentFile } from "@/lib/supabase/storage";
+import { uploadDocumentFile } from "@/lib/storage/s3";
 import { stuffingSchema } from "@/lib/validations/stuffing";
 import type { StuffingStatus } from "@/lib/constants/statuses";
 import { DocumentCategory } from "@prisma/client";

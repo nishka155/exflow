@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FileDown, Pencil, Trash2, CheckCircle2 } from "lucide-react";
 
@@ -18,11 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  setInvoiceStatusAction,
-  generateInvoicePdfAction,
-  deleteInvoiceAction,
-} from "@/lib/actions/invoices";
+import { api, ApiError } from "@/lib/api/client";
 import type { InvoiceStatus } from "@/lib/constants/statuses";
 
 export function InvoiceActions({
@@ -35,18 +32,33 @@ export function InvoiceActions({
   hasPdf: boolean;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [pending, startTransition] = React.useTransition();
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["invoice", invoiceId] });
+    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+  }
 
   function runAction(action: () => Promise<void>, successMessage: string) {
     startTransition(async () => {
       try {
         await action();
+        invalidate();
         toast.success(successMessage);
-        router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Something went wrong");
+        toast.error(err instanceof ApiError ? err.message : "Something went wrong");
       }
     });
+  }
+
+  async function handleDownloadPdf() {
+    try {
+      const { url } = await api.get<{ url: string }>(`/api/invoices/${invoiceId}/pdf`);
+      window.open(url, "_blank");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not download PDF");
+    }
   }
 
   return (
@@ -55,7 +67,10 @@ export function InvoiceActions({
         <Button
           disabled={pending}
           onClick={() =>
-            runAction(() => setInvoiceStatusAction(invoiceId, "APPROVED"), "Invoice approved")
+            runAction(
+              () => api.post(`/api/invoices/${invoiceId}/status`, { status: "APPROVED" }),
+              "Invoice approved"
+            )
           }
         >
           <CheckCircle2 />
@@ -66,7 +81,10 @@ export function InvoiceActions({
         <Button
           disabled={pending}
           onClick={() =>
-            runAction(() => setInvoiceStatusAction(invoiceId, "COMPLETED"), "Invoice completed")
+            runAction(
+              () => api.post(`/api/invoices/${invoiceId}/status`, { status: "COMPLETED" }),
+              "Invoice completed"
+            )
           }
         >
           <CheckCircle2 />
@@ -76,17 +94,15 @@ export function InvoiceActions({
       <Button
         variant="outline"
         disabled={pending}
-        onClick={() => runAction(() => generateInvoicePdfAction(invoiceId), "PDF generated")}
+        onClick={() =>
+          runAction(() => api.post(`/api/invoices/${invoiceId}/pdf`), "PDF generated")
+        }
       >
         <FileDown />
         {hasPdf ? "Regenerate PDF" : "Generate PDF"}
       </Button>
       {hasPdf && (
-        <Button
-          variant="outline"
-          nativeButton={false}
-          render={<a href={`/api/invoices/${invoiceId}/pdf`} target="_blank" />}
-        >
+        <Button variant="outline" onClick={handleDownloadPdf}>
           <FileDown />
           Download PDF
         </Button>
@@ -118,7 +134,18 @@ export function InvoiceActions({
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => runAction(() => deleteInvoiceAction(invoiceId), "Invoice deleted")}
+                onClick={() =>
+                  startTransition(async () => {
+                    try {
+                      await api.delete(`/api/invoices/${invoiceId}`);
+                      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+                      toast.success("Invoice deleted");
+                      router.push("/invoices");
+                    } catch (err) {
+                      toast.error(err instanceof ApiError ? err.message : "Something went wrong");
+                    }
+                  })
+                }
               >
                 Delete
               </AlertDialogAction>

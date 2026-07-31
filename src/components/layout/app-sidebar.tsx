@@ -33,6 +33,7 @@ import {
   AvatarFallback,
 } from "@/components/ui/avatar";
 import { signOutAction } from "@/lib/auth/actions";
+import { useAuthStore } from "@/lib/store/auth-store";
 
 export function AppSidebar({
   role,
@@ -140,6 +141,7 @@ export function AppSidebar({
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={() => {
+                    useAuthStore.getState().clearAuth();
                     void signOutAction();
                   }}
                 >

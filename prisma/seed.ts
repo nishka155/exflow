@@ -1,16 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
-}
-const admin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
 
 const SEED_PASSWORD = "Password123!";
 
@@ -23,18 +15,10 @@ async function ensureUser(
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return existing;
 
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password: SEED_PASSWORD,
-    email_confirm: true,
-    user_metadata: { organization_id: organizationId, name, role },
+  const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10);
+  return prisma.user.create({
+    data: { id: randomUUID(), organizationId, email, name, role, passwordHash },
   });
-  if (error || !data.user) {
-    throw new Error(`Failed to create seed user ${email}: ${error?.message}`);
-  }
-  const user = await prisma.user.findUnique({ where: { id: data.user.id } });
-  if (!user) throw new Error(`Trigger did not create public.users row for ${email}`);
-  return user;
 }
 
 function daysAgo(n: number) {

@@ -1,19 +1,60 @@
 "use client";
 
 import * as React from "react";
-import { useActionState } from "react";
+import { Suspense } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { signInAction, type ActionResult } from "@/lib/auth/actions";
+import { api, ApiError } from "@/lib/api/client";
+import { useAuthStore } from "@/lib/store/auth-store";
 
-const initialState: ActionResult = {};
+interface LoginResponse {
+  token: string;
+  user: { id: string; organizationId: string; email: string; name: string; role: string };
+}
 
-export default function LoginPage() {
-  const [state, formAction, pending] = useActionState(signInAction, initialState);
+function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const resetSuccess = searchParams.get("reset") === "success";
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: async (values: { email: string; password: string }) => {
+      const data = await api.post<LoginResponse>("/api/auth/login", values);
+      // Also establish the legacy NextAuth cookie session so not-yet-migrated
+      // modules keep working for this user during the hybrid rollout.
+      await fetch("/api/auth/bridge-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      return data;
+    },
+    onSuccess: (data) => {
+      setAuth(data.token, data.user);
+      router.push("/dashboard");
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : "Something went wrong");
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const formData = new FormData(e.currentTarget);
+    mutation.mutate({
+      email: String(formData.get("email") ?? ""),
+      password: String(formData.get("password") ?? ""),
+    });
+  }
 
   return (
     <Card>
@@ -22,7 +63,12 @@ export default function LoginPage() {
         <CardDescription>Sign in to your ExFlow workspace.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={formAction} className="space-y-4">
+        {resetSuccess && (
+          <p className="mb-4 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+            Your password has been reset. Sign in with your new password.
+          </p>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" name="email" type="email" required autoComplete="email" />
@@ -36,9 +82,9 @@ export default function LoginPage() {
             </div>
             <Input id="password" name="password" type="password" required autoComplete="current-password" />
           </div>
-          {state.error && <p className="text-sm text-destructive">{state.error}</p>}
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Signing in…" : "Sign in"}
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button type="submit" className="w-full" disabled={mutation.isPending}>
+            {mutation.isPending ? "Signing in…" : "Sign in"}
           </Button>
         </form>
         <p className="mt-4 text-center text-sm text-muted-foreground">
@@ -49,5 +95,13 @@ export default function LoginPage() {
         </p>
       </CardContent>
     </Card>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

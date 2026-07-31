@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { Plus, FileText } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, FileText, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -14,19 +17,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { listInvoices } from "@/lib/queries/invoices";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api } from "@/lib/api/client";
 import { INVOICE_STATUS_CONFIG, type InvoiceStatus } from "@/lib/constants/statuses";
-import { redirect } from "next/navigation";
 
 const currencyFormatter = (currency: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 2 });
 
-export default async function InvoicesPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface InvoiceListItem {
+  id: string;
+  invoiceNumber: string;
+  material: string;
+  exportCountry: string;
+  currency: string;
+  totalAmount: string;
+  status: string;
+  customer: { name: string };
+}
 
-  const invoices = await listInvoices(user.organizationId);
+function InvoicesPageContent() {
+  const { data: invoices, isLoading, error } = useQuery({
+    queryKey: ["invoices"],
+    queryFn: () => api.get<InvoiceListItem[]>("/api/invoices"),
+  });
 
   return (
     <div>
@@ -41,7 +54,15 @@ export default async function InvoicesPage() {
         }
       />
 
-      {invoices.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <p className="py-16 text-center text-sm text-destructive">
+          Could not load invoices. Please try again.
+        </p>
+      ) : !invoices || invoices.length === 0 ? (
         <EmptyState
           icon={FileText}
           title="No invoices yet"
@@ -86,5 +107,13 @@ export default async function InvoicesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function InvoicesPage() {
+  return (
+    <AuthGuard>
+      <InvoicesPageContent />
+    </AuthGuard>
   );
 }

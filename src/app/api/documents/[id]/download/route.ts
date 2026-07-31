@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/require-user";
 import { getCustomerForPortalUser } from "@/lib/queries/customer-portal";
-import { getSignedDownloadUrl } from "@/lib/supabase/storage";
+import { getSignedDownloadUrl } from "@/lib/storage/s3";
 
 export async function GET(
   _request: Request,

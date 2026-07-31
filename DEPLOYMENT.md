@@ -24,37 +24,33 @@ Set these in the Vercel project's **Settings → Environment Variables**
 
 | Variable | Where to find it |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API (publishable/anon key) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API (secret/service role key) |
-| `DATABASE_URL` | Supabase → Project Settings → Database → Connection string → **Transaction pooler** (port 6543, `?pgbouncer=true`). **Use the pooler here, not the direct connection** — Vercel functions are serverless and will exhaust Postgres's connection limit against a direct connection. |
-| `DIRECT_URL` | Same page → **Session/Direct** connection (port 5432). Only used for running migrations. |
+| `DATABASE_URL` | Render → your Postgres instance → Connections → the connection string. |
+| `DIRECT_URL` | Same connection string — Render doesn't need a separate pooled/direct split the way Supabase's PgBouncer setup did. |
+| `AUTH_SECRET` | Generate locally with `openssl rand -base64 32`. |
+| `RESEND_API_KEY` | resend.com → API Keys. Required in production — without it, password-reset/invite emails just log to the server console instead of sending. |
+| `RESEND_FROM_EMAIL` | e.g. `ExFlow <onboarding@resend.dev>`, or your own verified sending domain in Resend. |
+| `S3_ENDPOINT` | Leave unset for real AWS S3. Set to your provider's endpoint for anything else (e.g. Cloudflare R2, Backblaze B2). |
+| `S3_REGION` | Your bucket's region (`auto` is fine for R2). |
+| `S3_BUCKET` | Your bucket name. |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | From your storage provider. |
 | `NEXT_PUBLIC_APP_URL` | Your production URL, e.g. `https://your-app.vercel.app` (or custom domain once attached) |
 
-## 4. Point Supabase Auth at your real domain
+## 4. Run migrations against the production database
 
-This step is easy to miss and breaks password-reset/invite emails in
-production. In Supabase → **Authentication → URL Configuration**:
-
-- **Site URL**: your production URL (`https://your-app.vercel.app`)
-- **Redirect URLs**: add `https://your-app.vercel.app/auth/callback`
-
-Without this, password reset and portal-invite emails will link back to
-`localhost`.
-
-## 5. Run migrations against the production database
-
-From your local machine, with `.env` pointed at the **production** Supabase
-project's `DATABASE_URL`/`DIRECT_URL`:
+From your local machine, with `.env` pointed at the **production** Render
+database's `DATABASE_URL`/`DIRECT_URL`:
 
 ```bash
 pnpm exec prisma migrate deploy
 ```
 
-This applies `prisma/migrations/*` (schema + RLS policies + auth trigger) to
-the production database. Do this once before the first real signup.
+This applies the schema migrations to the production database — run once
+before the first real signup. (Two older migrations,
+`0002_auth_rls`/`0003_fix_new_user_trigger`, are Supabase-specific history
+from before the Auth.js migration and are not part of what gets applied to a
+fresh Render database — see the migration files' own comments.)
 
-## 6. Deploy
+## 5. Deploy
 
 Click **Deploy** in Vercel. Every push to `master` after this redeploys
 automatically.
@@ -62,8 +58,9 @@ automatically.
 ## After deploying
 
 - Sign up for your real workspace at `https://your-app.vercel.app/signup`.
-- The Supabase Storage bucket (`documents`) and RLS policies are already
-  created by the migrations — no extra Supabase setup needed.
-- If you want to seed sample data on the production database, point
-  `.env` at production and run `pnpm exec prisma db seed` — same caveats
-  as local: it seeds into whichever organization already exists.
+- Make sure your S3-compatible bucket actually exists and its credentials are
+  correct before relying on document uploads/downloads or PDF generation in
+  production — those will fail with the placeholder values in `.env.example`.
+- If you want to seed sample data on the production database, point `.env`
+  at production and run `pnpm exec prisma db seed` — same caveats as local:
+  it seeds into whichever organization already exists.
