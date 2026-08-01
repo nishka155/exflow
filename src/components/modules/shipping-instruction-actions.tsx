@@ -1,15 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Send, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  sendShippingInstructionAction,
-  confirmShippingInstructionAction,
-} from "@/lib/actions/shipping-instructions";
+import { api, ApiError } from "@/lib/api/client";
 import type { SIStatus } from "@/lib/constants/statuses";
 
 export function ShippingInstructionActions({
@@ -19,17 +16,18 @@ export function ShippingInstructionActions({
   siId: string;
   status: SIStatus;
 }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [pending, startTransition] = React.useTransition();
 
-  function run(action: () => Promise<void>, message: string) {
+  function run(action: () => Promise<unknown>, message: string) {
     startTransition(async () => {
       try {
         await action();
+        queryClient.invalidateQueries({ queryKey: ["shipping-instruction", siId] });
+        queryClient.invalidateQueries({ queryKey: ["shipping-instructions"] });
         toast.success(message);
-        router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Something went wrong");
+        toast.error(err instanceof ApiError ? err.message : "Something went wrong");
       }
     });
   }
@@ -39,7 +37,9 @@ export function ShippingInstructionActions({
       {status === "DRAFT" && (
         <Button
           disabled={pending}
-          onClick={() => run(() => sendShippingInstructionAction(siId), "Sent to shipping line")}
+          onClick={() =>
+            run(() => api.post(`/api/shipping-instructions/${siId}/send`), "Sent to shipping line")
+          }
         >
           <Send />
           Send to Shipping Line
@@ -48,7 +48,9 @@ export function ShippingInstructionActions({
       {status === "SENT" && (
         <Button
           disabled={pending}
-          onClick={() => run(() => confirmShippingInstructionAction(siId), "Marked as confirmed")}
+          onClick={() =>
+            run(() => api.post(`/api/shipping-instructions/${siId}/confirm`), "Marked as confirmed")
+          }
         >
           <CheckCircle2 />
           Mark Confirmed

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { FilePlus2, Truck, Container, Ship, SearchIcon } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { NAV_SECTIONS } from "@/lib/constants/nav";
 import { type Role, roleCanAccess } from "@/lib/constants/roles";
+import { QUICK_ACTIONS } from "@/lib/constants/quick-actions";
 
 interface PaletteEntry {
   title: string;
@@ -17,13 +18,6 @@ interface PaletteEntry {
   icon: LucideIcon;
   group: string;
 }
-
-const QUICK_ACTIONS: (PaletteEntry & { moduleKey: string })[] = [
-  { title: "New Export Invoice", href: "/invoices/new", icon: FilePlus2, moduleKey: "invoices", group: "Quick actions" },
-  { title: "New Truck Dispatch", href: "/dispatches/new", icon: Truck, moduleKey: "dispatches", group: "Quick actions" },
-  { title: "New Factory Stuffing", href: "/stuffing/new", icon: Container, moduleKey: "stuffing", group: "Quick actions" },
-  { title: "New Shipping Instruction", href: "/shipping-instructions/new", icon: Ship, moduleKey: "shipping-instructions", group: "Quick actions" },
-];
 
 export function CommandPalette({ role }: { role: Role }) {
   const [open, setOpen] = React.useState(false);
@@ -57,7 +51,9 @@ export function CommandPalette({ role }: { role: Role }) {
   }, []);
 
   const allEntries = React.useMemo<PaletteEntry[]>(() => {
-    const quickActions = QUICK_ACTIONS.filter((a) => roleCanAccess(role, a.moduleKey));
+    const quickActions = QUICK_ACTIONS.filter((a) => roleCanAccess(role, a.moduleKey)).map(
+      (a) => ({ ...a, group: "Quick actions" })
+    );
     const navEntries = NAV_SECTIONS.flatMap((section) =>
       section.items
         .filter((item) => roleCanAccess(role, item.moduleKey))

@@ -1,14 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PlayCircle, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { setStuffingStatusAction, updateStuffingChecklistAction } from "@/lib/actions/stuffing";
+import { api, ApiError } from "@/lib/api/client";
 import type { StuffingStatus } from "@/lib/constants/statuses";
 
 export function StuffingStatusActions({
@@ -18,17 +18,18 @@ export function StuffingStatusActions({
   stuffingId: string;
   status: StuffingStatus;
 }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [pending, startTransition] = React.useTransition();
 
   function run(next: StuffingStatus, message: string) {
     startTransition(async () => {
       try {
-        await setStuffingStatusAction(stuffingId, next);
+        await api.post(`/api/stuffing/${stuffingId}/status`, { status: next });
+        queryClient.invalidateQueries({ queryKey: ["stuffing", stuffingId] });
+        queryClient.invalidateQueries({ queryKey: ["stuffings"] });
         toast.success(message);
-        router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Something went wrong");
+        toast.error(err instanceof ApiError ? err.message : "Something went wrong");
       }
     });
   }
@@ -54,7 +55,7 @@ export function StuffingStatusActions({
 const CHECKLIST_ITEMS = [
   { name: "checklistContainerClean", label: "Container Clean" },
   { name: "checklistContainerDamage", label: "Container Damage" },
-  { name: "checklistSealApplied", label: "Seal Applied" },
+  { name: "checklistSealApplied", label: "Seal Verified" },
   { name: "checklistDocumentsUploaded", label: "Documents Uploaded" },
 ] as const;
 
@@ -65,22 +66,18 @@ export function StuffingChecklist({
   stuffingId: string;
   values: Record<(typeof CHECKLIST_ITEMS)[number]["name"], boolean>;
 }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [pending, startTransition] = React.useTransition();
   const [checked, setChecked] = React.useState(values);
 
   function handleSave() {
-    const formData = new FormData();
-    for (const item of CHECKLIST_ITEMS) {
-      if (checked[item.name]) formData.set(item.name, "on");
-    }
     startTransition(async () => {
       try {
-        await updateStuffingChecklistAction(stuffingId, formData);
+        await api.put(`/api/stuffing/${stuffingId}/checklist`, checked);
+        queryClient.invalidateQueries({ queryKey: ["stuffing", stuffingId] });
         toast.success("Checklist updated");
-        router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Something went wrong");
+        toast.error(err instanceof ApiError ? err.message : "Something went wrong");
       }
     });
   }

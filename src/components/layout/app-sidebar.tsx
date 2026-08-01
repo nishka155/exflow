@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Ship, User, LogOut, ChevronsUpDown } from "lucide-react";
 
 import {
@@ -32,7 +32,6 @@ import {
   Avatar,
   AvatarFallback,
 } from "@/components/ui/avatar";
-import { signOutAction } from "@/lib/auth/actions";
 import { useAuthStore } from "@/lib/store/auth-store";
 
 export function AppSidebar({
@@ -45,6 +44,7 @@ export function AppSidebar({
   userEmail: string;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   const initials = userName
     .split(" ")
@@ -142,7 +142,7 @@ export function AppSidebar({
                   variant="destructive"
                   onClick={() => {
                     useAuthStore.getState().clearAuth();
-                    void signOutAction();
+                    router.push("/login");
                   }}
                 >
                   <LogOut />

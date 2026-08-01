@@ -1,5 +1,8 @@
-import { redirect } from "next/navigation";
-import { FileText, FileDown } from "lucide-react";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { FileText, FileDown, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -13,26 +16,49 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { getCustomerForPortalUser, getPortalInvoices } from "@/lib/queries/customer-portal";
+import { api, ApiError } from "@/lib/api/client";
 import { INVOICE_STATUS_CONFIG, type InvoiceStatus } from "@/lib/constants/statuses";
 
 const currency = (c: string) => new Intl.NumberFormat("en-US", { style: "currency", currency: c });
 
-export default async function PortalInvoicesPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface PortalInvoice {
+  id: string;
+  invoiceNumber: string;
+  material: string;
+  currency: string;
+  totalAmount: string;
+  status: string;
+  pdfUrl: string | null;
+}
 
-  const customer = await getCustomerForPortalUser(user.id);
-  if (!customer) redirect("/login");
+export default function PortalInvoicesPage() {
+  const { data: invoices, isLoading, error } = useQuery({
+    queryKey: ["portal-invoices"],
+    queryFn: () => api.get<PortalInvoice[]>("/api/portal/invoices"),
+  });
 
-  const invoices = await getPortalInvoices(customer.id);
+  async function handleDownload(id: string) {
+    try {
+      const { url } = await api.get<{ url: string }>(`/api/portal/invoices/${id}/pdf`);
+      window.open(url, "_blank");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not download PDF");
+    }
+  }
 
   return (
     <div>
       <PageHeader title="Invoices" description="Every export invoice raised against your orders." />
 
-      {invoices.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <p className="py-16 text-center text-sm text-destructive">
+          Could not load invoices. Please try again.
+        </p>
+      ) : !invoices || invoices.length === 0 ? (
         <EmptyState icon={FileText} title="No invoices yet" description="Invoices will appear here once raised." />
       ) : (
         <div className="rounded-lg border">
@@ -62,8 +88,7 @@ export default async function PortalInvoicesPage() {
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        nativeButton={false}
-                        render={<a href={`/api/invoices/${inv.id}/pdf`} target="_blank" />}
+                        onClick={() => handleDownload(inv.id)}
                       >
                         <FileDown />
                       </Button>

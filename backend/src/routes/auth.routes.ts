@@ -13,6 +13,7 @@ import {
   resetPasswordSchema,
 } from "../lib/validations/auth";
 import { HttpError } from "../middleware/error-handler";
+import { requireAuth } from "../middleware/require-auth";
 
 const router = Router();
 
@@ -200,6 +201,18 @@ router.post("/accept-invite", async (req, res, next) => {
 
     const jwtToken = signToken({ userId: updatedUser.id });
     res.json({ token: jwtToken, user: publicUser(updatedUser) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/me", requireAuth, async (req, res, next) => {
+  try {
+    const organization = await prisma.organization.findUniqueOrThrow({
+      where: { id: req.user!.organizationId },
+      select: { id: true, name: true },
+    });
+    res.json({ user: publicUser(req.user!), organization });
   } catch (err) {
     next(err);
   }

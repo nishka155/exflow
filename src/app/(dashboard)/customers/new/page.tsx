@@ -1,12 +1,22 @@
+"use client";
+
 import { PageHeader } from "@/components/shared/page-header";
 import { CustomerForm } from "@/components/modules/customer-form";
-import { createCustomerAction } from "@/lib/actions/customers";
+import { AuthGuard } from "@/components/auth/auth-guard";
 
-export default function NewCustomerPage() {
+function NewCustomerPageContent() {
   return (
     <div>
       <PageHeader title="New Customer" />
-      <CustomerForm action={createCustomerAction} />
+      <CustomerForm />
     </div>
+  );
+}
+
+export default function NewCustomerPage() {
+  return (
+    <AuthGuard>
+      <NewCustomerPageContent />
+    </AuthGuard>
   );
 }

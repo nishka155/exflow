@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { Plus, DoorOpen } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, DoorOpen, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -14,16 +17,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { listGateIns } from "@/lib/queries/gate-in";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api } from "@/lib/api/client";
 import { GATE_IN_STATUS_CONFIG, type GateInStatus } from "@/lib/constants/statuses";
-import { redirect } from "next/navigation";
 
-export default async function GateInPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface GateInListItem {
+  id: string;
+  containerNumber: string;
+  terminal: string;
+  gateInDate: string;
+  status: string;
+  booking: { bookingNumber: string; customer: { name: string } };
+}
 
-  const gateIns = await listGateIns(user.organizationId);
+function GateInPageContent() {
+  const { data: gateIns, isLoading, error } = useQuery({
+    queryKey: ["gate-ins"],
+    queryFn: () => api.get<GateInListItem[]>("/api/gate-in"),
+  });
 
   return (
     <div>
@@ -38,7 +49,15 @@ export default async function GateInPage() {
         }
       />
 
-      {gateIns.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <p className="py-16 text-center text-sm text-destructive">
+          Could not load gate-in records. Please try again.
+        </p>
+      ) : !gateIns || gateIns.length === 0 ? (
         <EmptyState
           icon={DoorOpen}
           title="No gate-in records yet"
@@ -56,7 +75,7 @@ export default async function GateInPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Container Number</TableHead>
-                <TableHead>Shipment</TableHead>
+                <TableHead>Booking</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Terminal</TableHead>
                 <TableHead>Gate In Date</TableHead>
@@ -67,8 +86,8 @@ export default async function GateInPage() {
               {gateIns.map((g) => (
                 <ClickableTableRow key={g.id} href={`/gate-in/${g.id}`}>
                   <TableCell className="font-medium">{g.containerNumber}</TableCell>
-                  <TableCell>{g.shipment.shipmentNumber}</TableCell>
-                  <TableCell>{g.shipment.customer.name}</TableCell>
+                  <TableCell>{g.booking.bookingNumber}</TableCell>
+                  <TableCell>{g.booking.customer.name}</TableCell>
                   <TableCell>{g.terminal}</TableCell>
                   <TableCell>{new Date(g.gateInDate).toLocaleDateString()}</TableCell>
                   <TableCell>
@@ -81,5 +100,13 @@ export default async function GateInPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function GateInPage() {
+  return (
+    <AuthGuard>
+      <GateInPageContent />
+    </AuthGuard>
   );
 }

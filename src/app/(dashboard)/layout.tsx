@@ -1,34 +1,49 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { CommandPalette } from "@/components/layout/command-palette";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { prisma } from "@/lib/prisma";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { useAuthStore } from "@/lib/store/auth-store";
+import type { Role } from "@/lib/constants/roles";
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  if (user.role === "CUSTOMER") redirect("/portal");
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const user = useAuthStore((s) => s.user);
 
-  const notifications = await prisma.notification.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    take: 20,
-  });
+  React.useEffect(() => {
+    if (user?.role === "CUSTOMER") router.replace("/portal");
+  }, [user, router]);
+
+  if (!user || user.role === "CUSTOMER") {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
-      <AppSidebar role={user.role} userName={user.name} userEmail={user.email} />
+      <AppSidebar role={user.role as Role} userName={user.name} userEmail={user.email} />
       <SidebarInset>
-        <Topbar notifications={notifications} />
+        <Topbar />
         <main className="flex-1 p-6">{children}</main>
       </SidebarInset>
-      <CommandPalette role={user.role} />
+      <CommandPalette role={user.role as Role} />
     </SidebarProvider>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthGuard>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </AuthGuard>
   );
 }

@@ -2,12 +2,12 @@ import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { Activity } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
-import type { DashboardData } from "@/lib/queries/dashboard";
+import type { DashboardEvent } from "@/types/dashboard";
 
 export function RecentActivity({
   events,
 }: {
-  events: DashboardData["recentEvents"];
+  events: DashboardEvent[];
 }) {
   if (events.length === 0) {
     return (
@@ -27,16 +27,16 @@ export function RecentActivity({
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="text-sm leading-snug">
               <Link
-                href={`/shipments/${event.shipmentId}`}
+                href={`/bookings/${event.bookingId}`}
                 className="font-medium hover:underline"
               >
-                {event.shipment.shipmentNumber}
+                {event.booking.bookingNumber}
               </Link>{" "}
               <span className="text-muted-foreground">— {event.title}</span>
             </p>
             <p className="text-xs text-muted-foreground">
               {event.actor?.name ?? "System"} ·{" "}
-              {formatDistanceToNow(event.occurredAt, { addSuffix: true })}
+              {formatDistanceToNow(new Date(event.occurredAt), { addSuffix: true })}
             </p>
           </div>
         </li>

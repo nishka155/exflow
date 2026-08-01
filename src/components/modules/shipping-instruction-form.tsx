@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useActionState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -16,22 +16,19 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
-  Shipment,
+  Booking,
   Customer,
   Invoice,
   FactoryStuffing,
   GateIn,
 } from "@prisma/client";
-import {
-  createShippingInstructionAction,
-  type ActionResult,
-} from "@/lib/actions/shipping-instructions";
+import { api, ApiError } from "@/lib/api/client";
 
-type ShipmentOption = Shipment & {
+type BookingOption = Booking & {
   customer: Customer;
   invoice: Invoice | null;
-  factoryStuffing: FactoryStuffing | null;
-  gateIn: GateIn | null;
+  factoryStuffings: FactoryStuffing[];
+  gateIns: GateIn[];
 };
 
 interface Prefill {
@@ -46,39 +43,42 @@ interface Prefill {
   weight: string;
   containerNumber: string;
   sealNumber: string;
+  shippingLine: string;
+  vessel: string;
 }
 
-function buildPrefill(shipment: ShipmentOption, organizationName: string): Prefill {
+function buildPrefill(booking: BookingOption, organizationName: string): Prefill {
+  const stuffing = booking.factoryStuffings[0] ?? null;
   return {
     consignorName: organizationName,
-    consigneeName: shipment.customer.name,
-    consigneeAddress: [shipment.customer.address, shipment.customer.city, shipment.customer.country]
+    consigneeName: booking.customer.name,
+    consigneeAddress: [booking.customer.address, booking.customer.city, booking.customer.country]
       .filter(Boolean)
       .join(", "),
-    pol: shipment.factoryStuffing?.pol ?? "",
-    pod: shipment.factoryStuffing?.pod ?? "",
-    commodity: shipment.invoice?.material ?? "",
-    hsCode: shipment.invoice?.hsnCode ?? "",
-    packageCount: shipment.factoryStuffing?.numberOfBoxes?.toString() ?? "",
-    weight: shipment.invoice ? String(shipment.invoice.weight) : "",
-    containerNumber: shipment.factoryStuffing?.containerNumber ?? "",
-    sealNumber: shipment.factoryStuffing?.sealNumber ?? "",
+    pol: stuffing?.pol ?? booking.pol ?? "",
+    pod: stuffing?.pod ?? booking.pod ?? "",
+    commodity: booking.invoice?.material ?? booking.commodity ?? "",
+    hsCode: booking.invoice?.hsnCode ?? "",
+    packageCount: stuffing?.numberOfBoxes?.toString() ?? "",
+    weight: booking.invoice ? String(booking.invoice.weight) : "",
+    containerNumber: stuffing?.containerNumber ?? "",
+    sealNumber: stuffing?.sealNumber ?? "",
+    shippingLine: booking.shippingLine ?? "",
+    vessel: booking.vessel ?? "",
   };
 }
 
 export function ShippingInstructionForm({
-  shipments,
+  bookings,
   organizationName,
 }: {
-  shipments: ShipmentOption[];
+  bookings: BookingOption[];
   organizationName: string;
 }) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState<ActionResult, FormData>(
-    createShippingInstructionAction,
-    {}
-  );
-  const [shipmentId, setShipmentId] = React.useState("");
+  const queryClient = useQueryClient();
+  const [error, setError] = React.useState<string | null>(null);
+  const [bookingId, setBookingId] = React.useState("");
   const [prefill, setPrefill] = React.useState<Prefill>({
     consignorName: organizationName,
     consigneeName: "",
@@ -91,39 +91,81 @@ export function ShippingInstructionForm({
     weight: "",
     containerNumber: "",
     sealNumber: "",
+    shippingLine: "",
+    vessel: "",
   });
 
-  function handleShipmentChange(id: string) {
-    setShipmentId(id);
-    const shipment = shipments.find((s) => s.id === id);
-    if (shipment) setPrefill(buildPrefill(shipment, organizationName));
+  function handleBookingChange(id: string) {
+    setBookingId(id);
+    const booking = bookings.find((s) => s.id === id);
+    if (booking) setPrefill(buildPrefill(booking, organizationName));
   }
 
   function updatePrefill<K extends keyof Prefill>(key: K, value: Prefill[K]) {
     setPrefill((prev) => ({ ...prev, [key]: value }));
   }
 
+  const mutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      api.post<{ id: string }>("/api/shipping-instructions", payload),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["shipping-instructions"] });
+      router.push(`/shipping-instructions/${data.id}`);
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : "Something went wrong");
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const formData = new FormData(e.currentTarget);
+    mutation.mutate({
+      bookingId,
+      consignorName: prefill.consignorName,
+      consignorAddress: formData.get("consignorAddress") || undefined,
+      shippingLine: prefill.shippingLine || undefined,
+      vessel: prefill.vessel || undefined,
+      consigneeName: prefill.consigneeName,
+      consigneeAddress: prefill.consigneeAddress || undefined,
+      notifyPartyName: formData.get("notifyPartyName") || undefined,
+      notifyPartyAddress: formData.get("notifyPartyAddress") || undefined,
+      pol: prefill.pol,
+      pod: prefill.pod,
+      commodity: prefill.commodity,
+      hsCode: prefill.hsCode || undefined,
+      packageCount: prefill.packageCount || undefined,
+      weight: prefill.weight || undefined,
+      marks: formData.get("marks") || undefined,
+      containerNumber: prefill.containerNumber || undefined,
+      sealNumber: prefill.sealNumber || undefined,
+      freightTerms: formData.get("freightTerms") || undefined,
+      incoterms: formData.get("incoterms") || undefined,
+      voyage: formData.get("voyage") || undefined,
+    });
+  }
+
   return (
-    <form action={formAction} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Source Shipment</CardTitle>
+          <CardTitle className="text-sm font-medium">Source Booking</CardTitle>
         </CardHeader>
         <CardContent>
-          <input type="hidden" name="shipmentId" value={shipmentId} />
-          <Select value={shipmentId} onValueChange={(v) => v && handleShipmentChange(v)}>
+          <Select value={bookingId} onValueChange={(v) => v && handleBookingChange(v)}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a shipment (auto-fills fields below)">
+              <SelectValue placeholder="Select a booking (auto-fills fields below)">
                 {(value: string | null) => {
-                  const s = shipments.find((s) => s.id === value);
-                  return s ? `${s.shipmentNumber} · ${s.customer.name}` : null;
+                  const s = bookings.find((s) => s.id === value);
+                  return s ? `${s.bookingNumber} · ${s.customer.name}` : null;
                 }}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {shipments.map((s) => (
+              {bookings.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.shipmentNumber} · {s.customer.name}
+                  {s.bookingNumber} · {s.customer.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -142,6 +184,10 @@ export function ShippingInstructionForm({
               value={prefill.consignorName}
               onChange={(e) => updatePrefill("consignorName", e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="consignorAddress">Consignor Address</Label>
+            <Input id="consignorAddress" name="consignorAddress" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="consigneeName">Consignee</Label>
@@ -272,11 +318,21 @@ export function ShippingInstructionForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="shippingLine">Shipping Line</Label>
-            <Input id="shippingLine" name="shippingLine" />
+            <Input
+              id="shippingLine"
+              name="shippingLine"
+              value={prefill.shippingLine}
+              onChange={(e) => updatePrefill("shippingLine", e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="vessel">Vessel</Label>
-            <Input id="vessel" name="vessel" />
+            <Input
+              id="vessel"
+              name="vessel"
+              value={prefill.vessel}
+              onChange={(e) => updatePrefill("vessel", e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="voyage">Voyage</Label>
@@ -285,11 +341,11 @@ export function ShippingInstructionForm({
         </CardContent>
       </Card>
 
-      {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex items-center gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Create Shipping Instruction"}
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? "Saving…" : "Create Shipping Instruction"}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel

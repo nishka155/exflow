@@ -1,6 +1,10 @@
-import { notFound, redirect } from "next/navigation";
+"use client";
+
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { FileDown } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { FileDown, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -8,52 +12,102 @@ import { DocumentList } from "@/components/shared/document-list";
 import { DocumentUploader } from "@/components/shared/document-uploader";
 import { ShippingInstructionActions } from "@/components/modules/shipping-instruction-actions";
 import { GenerateReportButton } from "@/components/modules/generate-report-button";
+import { AuthGuard } from "@/components/auth/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { getShippingInstructionById } from "@/lib/queries/shipping-instructions";
-import {
-  uploadSiDocumentAction,
-  generateSiPdfAction,
-} from "@/lib/actions/shipping-instructions";
+import { api, ApiError } from "@/lib/api/client";
 import { SI_STATUS_CONFIG, type SIStatus } from "@/lib/constants/statuses";
+import type { Document } from "@prisma/client";
 
-export default async function ShippingInstructionDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface SIDetail {
+  id: string;
+  consignorName: string;
+  consigneeName: string;
+  notifyPartyName: string | null;
+  pol: string;
+  pod: string;
+  commodity: string;
+  hsCode: string | null;
+  packageCount: number | null;
+  weight: string | null;
+  containerNumber: string | null;
+  sealNumber: string | null;
+  freightTerms: string | null;
+  incoterms: string | null;
+  shippingLine: string | null;
+  vessel: string | null;
+  voyage: string | null;
+  status: string;
+  pdfUrl: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  bookingId: string;
+  booking: { bookingNumber: string; customer: { name: string } };
+  billOfLading: { id: string } | null;
+  documents: Document[];
+}
 
-  const si = await getShippingInstructionById(id, user.organizationId);
-  if (!si) notFound();
+function ShippingInstructionDetailPageContent() {
+  const params = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
 
-  const uploadAction = uploadSiDocumentAction.bind(null, si.id);
+  const { data: si, isLoading, error } = useQuery({
+    queryKey: ["shipping-instruction", params.id],
+    queryFn: () => api.get<SIDetail>(`/api/shipping-instructions/${params.id}`),
+  });
+
+  async function uploadDocument(formData: FormData) {
+    try {
+      await api.post(`/api/shipping-instructions/${params.id}/documents`, formData);
+      queryClient.invalidateQueries({ queryKey: ["shipping-instruction", params.id] });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Upload failed");
+      throw err;
+    }
+  }
+
+  async function handleDownloadPdf() {
+    try {
+      const { url } = await api.get<{ url: string }>(`/api/shipping-instructions/${params.id}/pdf`);
+      window.open(url, "_blank");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not download PDF");
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error || !si) {
+    return <p className="py-16 text-center text-sm text-destructive">Shipping instruction not found.</p>;
+  }
 
   return (
     <div>
       <PageHeader
-        title={`SI · ${si.shipment.shipmentNumber}`}
-        description={si.shipment.customer.name}
+        title={`SI · ${si.booking.bookingNumber}`}
+        description={si.booking.customer.name}
         actions={<StatusBadge config={SI_STATUS_CONFIG[si.status as SIStatus]} />}
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <ShippingInstructionActions siId={si.id} status={si.status as SIStatus} />
         <GenerateReportButton
-          action={generateSiPdfAction.bind(null, si.id)}
+          action={() => api.post(`/api/shipping-instructions/${si.id}/pdf`)}
           hasReport={!!si.pdfUrl}
           label="Generate PDF"
           regenerateLabel="Regenerate PDF"
+          onSuccess={() =>
+            queryClient.invalidateQueries({ queryKey: ["shipping-instruction", si.id] })
+          }
         />
         {si.pdfUrl && (
-          <Button
-            variant="outline"
-            nativeButton={false}
-            render={<a href={`/api/shipping-instructions/${si.id}/pdf`} target="_blank" />}
-          >
+          <Button variant="outline" onClick={handleDownloadPdf}>
             <FileDown />
             Download PDF
           </Button>
@@ -89,10 +143,10 @@ export default async function ShippingInstructionDetailPage({
           </CardHeader>
           <CardContent className="space-y-3">
             <Field
-              label="Shipment"
+              label="Booking"
               value={
-                <Link href={`/shipments/${si.shipmentId}`} className="text-brand hover:underline">
-                  {si.shipment.shipmentNumber}
+                <Link href={`/bookings/${si.bookingId}`} className="text-brand hover:underline">
+                  {si.booking.bookingNumber}
                 </Link>
               }
             />
@@ -120,7 +174,7 @@ export default async function ShippingInstructionDetailPage({
           <CardTitle className="text-sm font-medium">Documents</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <DocumentUploader action={uploadAction} />
+          <DocumentUploader action={uploadDocument} />
           <DocumentList documents={si.documents} />
         </CardContent>
       </Card>
@@ -134,5 +188,13 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-sm">{value}</p>
     </div>
+  );
+}
+
+export default function ShippingInstructionDetailPage() {
+  return (
+    <AuthGuard>
+      <ShippingInstructionDetailPageContent />
+    </AuthGuard>
   );
 }

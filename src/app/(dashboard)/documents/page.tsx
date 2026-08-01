@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
-import { Download, FolderOpen } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Download, FolderOpen, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -13,10 +18,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { listDocuments } from "@/lib/queries/documents";
-import { redirect } from "next/navigation";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api, ApiError } from "@/lib/api/client";
 import type { DocumentCategory } from "@prisma/client";
+
+interface DocumentListItem {
+  id: string;
+  fileName: string;
+  category: string;
+  bookingId: string | null;
+  fileSizeBytes: number | null;
+  createdAt: string;
+  booking: { bookingNumber: string } | null;
+  uploadedBy: { name: string } | null;
+}
 
 function formatBytes(bytes: number | null) {
   if (!bytes) return "—";
@@ -25,19 +40,29 @@ function formatBytes(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default async function DocumentsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string; category?: string }>;
-}) {
-  const { q, category } = await searchParams;
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+function DocumentsPageContent() {
+  const searchParams = useSearchParams();
+  const q = searchParams.get("q") ?? "";
+  const category = searchParams.get("category") ?? "";
 
-  const documents = await listDocuments(user.organizationId, {
-    search: q,
-    category: category as DocumentCategory | undefined,
+  const { data: documents, isLoading, error } = useQuery({
+    queryKey: ["documents", { q, category }],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (category) params.set("category", category);
+      return api.get<DocumentListItem[]>(`/api/documents?${params.toString()}`);
+    },
   });
+
+  async function handleDownload(id: string) {
+    try {
+      const { url } = await api.get<{ url: string }>(`/api/documents/${id}/download`);
+      window.open(url, "_blank");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not download file");
+    }
+  }
 
   return (
     <div>
@@ -46,9 +71,17 @@ export default async function DocumentsPage({
         description="Every file uploaded across invoices, dispatches, stuffing, and shipping documents."
       />
 
-      <DocumentSearchForm defaultSearch={q ?? ""} defaultCategory={category ?? ""} />
+      <DocumentSearchForm defaultSearch={q} defaultCategory={category} />
 
-      {documents.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <p className="py-16 text-center text-sm text-destructive">
+          Could not load documents. Please try again.
+        </p>
+      ) : !documents || documents.length === 0 ? (
         <EmptyState
           icon={FolderOpen}
           title="No documents found"
@@ -61,7 +94,7 @@ export default async function DocumentsPage({
               <TableRow>
                 <TableHead>File Name</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Shipment</TableHead>
+                <TableHead>Booking</TableHead>
                 <TableHead>Uploaded By</TableHead>
                 <TableHead>Size</TableHead>
                 <TableHead>Date</TableHead>
@@ -76,12 +109,12 @@ export default async function DocumentsPage({
                     <Badge variant="outline">{doc.category.replaceAll("_", " ")}</Badge>
                   </TableCell>
                   <TableCell>
-                    {doc.shipment ? (
+                    {doc.booking ? (
                       <Link
-                        href={`/shipments/${doc.shipmentId}`}
+                        href={`/bookings/${doc.bookingId}`}
                         className="text-brand hover:underline"
                       >
-                        {doc.shipment.shipmentNumber}
+                        {doc.booking.bookingNumber}
                       </Link>
                     ) : (
                       "—"
@@ -91,14 +124,13 @@ export default async function DocumentsPage({
                   <TableCell>{formatBytes(doc.fileSizeBytes)}</TableCell>
                   <TableCell>{new Date(doc.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>
-                    <a
-                      href={`/api/documents/${doc.id}/download`}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(doc.id)}
                       className="text-muted-foreground hover:text-foreground"
                     >
                       <Download className="size-4" />
-                    </a>
+                    </button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -107,5 +139,13 @@ export default async function DocumentsPage({
         </div>
       )}
     </div>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <AuthGuard>
+      <DocumentsPageContent />
+    </AuthGuard>
   );
 }

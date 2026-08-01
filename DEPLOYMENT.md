@@ -1,4 +1,9 @@
-# Deploying ExFlow to Vercel
+# Deploying ExFlow
+
+ExFlow is now a split architecture: a Next.js frontend (Vercel) and a separate
+Express API backend (Render, Railway, Fly, or any Node host), sharing a Neon
+Postgres database. The frontend never talks to Postgres directly — every
+request goes through the backend's `/api/*` routes over HTTPS with a JWT.
 
 ## 1. Push the code to GitHub
 
@@ -7,60 +12,76 @@ git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO.git
 git push -u origin master
 ```
 
-(Create the empty repo first at github.com/new — don't initialize it with a
-README, since this project already has one.)
+## 2. Create the Neon database
 
-## 2. Import into Vercel
+1. Go to [neon.tech](https://neon.tech) and create a project.
+2. From the project dashboard's **Connect** panel, copy the **pooled**
+   connection string (has `-pooler` in the hostname) for `DATABASE_URL`, and
+   toggle pooling off to get the **direct** string for `DIRECT_URL`.
 
-1. Go to [vercel.com/new](https://vercel.com/new) and import the GitHub repo.
-2. Vercel auto-detects Next.js — leave the build settings as default
-   (`pnpm build`, output directory auto-detected).
-3. Before clicking Deploy, add the environment variables below.
+## 3. Deploy the backend (`backend/`)
 
-## 3. Environment variables
+Any Node host works — these steps assume Render, but the env vars are the
+same everywhere.
 
-Set these in the Vercel project's **Settings → Environment Variables**
-(Production, and Preview if you want preview deploys to work too):
+1. Create a new Web Service pointed at this repo, **root directory
+   `backend`**.
+2. Build command: `npm install && npm run build`. Start command:
+   `npx prisma migrate deploy && npm start`.
+3. Set these environment variables:
 
-| Variable | Where to find it |
-|---|---|
-| `DATABASE_URL` | Render → your Postgres instance → Connections → the connection string. |
-| `DIRECT_URL` | Same connection string — Render doesn't need a separate pooled/direct split the way Supabase's PgBouncer setup did. |
-| `AUTH_SECRET` | Generate locally with `openssl rand -base64 32`. |
-| `RESEND_API_KEY` | resend.com → API Keys. Required in production — without it, password-reset/invite emails just log to the server console instead of sending. |
-| `RESEND_FROM_EMAIL` | e.g. `ExFlow <onboarding@resend.dev>`, or your own verified sending domain in Resend. |
-| `S3_ENDPOINT` | Leave unset for real AWS S3. Set to your provider's endpoint for anything else (e.g. Cloudflare R2, Backblaze B2). |
-| `S3_REGION` | Your bucket's region (`auto` is fine for R2). |
-| `S3_BUCKET` | Your bucket name. |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | From your storage provider. |
-| `NEXT_PUBLIC_APP_URL` | Your production URL, e.g. `https://your-app.vercel.app` (or custom domain once attached) |
+   | Variable | Where to find it |
+   |---|---|
+   | `DATABASE_URL` | Neon pooled connection string (step 2). |
+   | `DIRECT_URL` | Neon direct connection string (step 2). |
+   | `JWT_SECRET` | Generate with `openssl rand -base64 32`. |
+   | `JWT_EXPIRES_IN` | e.g. `7d`. |
+   | `PORT` | Your host usually sets this for you; otherwise `4000`. |
+   | `CORS_ORIGIN` | Your Vercel frontend URL, e.g. `https://your-app.vercel.app`. |
+   | `RESEND_API_KEY` | resend.com → API Keys. Without it, invite/reset emails just log to the server console instead of sending. |
+   | `RESEND_FROM_EMAIL` | e.g. `ExFlow <onboarding@resend.dev>`, or your own verified sending domain in Resend. |
+   | `S3_ENDPOINT` | Leave unset for real AWS S3. Set to your provider's endpoint for anything else (Cloudflare R2, Backblaze B2). |
+   | `S3_REGION` | Your bucket's region (`auto` is fine for R2). |
+   | `S3_BUCKET` | Your bucket name. |
+   | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | From your storage provider. |
 
-## 4. Run migrations against the production database
+4. Deploy. Note the resulting backend URL (e.g. `https://exflow-api.onrender.com`) —
+   you'll need it for the frontend.
 
-From your local machine, with `.env` pointed at the **production** Render
-database's `DATABASE_URL`/`DIRECT_URL`:
+A `backend/Dockerfile` is included if your host deploys from a container
+instead of a buildpack.
+
+## 4. Deploy the frontend to Vercel
+
+1. Go to [vercel.com/new](https://vercel.com/new) and import the GitHub repo
+   (root directory: repo root, not `backend`).
+2. Vercel auto-detects Next.js — leave build settings as default.
+3. Set environment variables:
+
+   | Variable | Value |
+   |---|---|
+   | `NEXT_PUBLIC_API_URL` | Your deployed backend URL from step 3, e.g. `https://exflow-api.onrender.com`. |
+   | `NEXT_PUBLIC_APP_URL` | Your Vercel URL, e.g. `https://your-app.vercel.app`. |
+
+   The frontend has no database credentials and needs none — everything
+   goes through `NEXT_PUBLIC_API_URL`.
+4. Deploy.
+
+## 5. Seed sample data (optional)
+
+From `backend/`, with `.env` pointed at the production `DATABASE_URL`:
 
 ```bash
-pnpm exec prisma migrate deploy
+npx prisma db seed
 ```
 
-This applies the schema migrations to the production database — run once
-before the first real signup. (Two older migrations,
-`0002_auth_rls`/`0003_fix_new_user_trigger`, are Supabase-specific history
-from before the Auth.js migration and are not part of what gets applied to a
-fresh Render database — see the migration files' own comments.)
-
-## 5. Deploy
-
-Click **Deploy** in Vercel. Every push to `master` after this redeploys
-automatically.
+This seeds into whichever organization already exists — sign up for a real
+workspace first at `https://your-app.vercel.app/signup`.
 
 ## After deploying
 
-- Sign up for your real workspace at `https://your-app.vercel.app/signup`.
 - Make sure your S3-compatible bucket actually exists and its credentials are
   correct before relying on document uploads/downloads or PDF generation in
-  production — those will fail with the placeholder values in `.env.example`.
-- If you want to seed sample data on the production database, point `.env`
-  at production and run `pnpm exec prisma db seed` — same caveats as local:
-  it seeds into whichever organization already exists.
+  production.
+- Every push to `master` redeploys both the frontend (Vercel) and backend
+  (if your host has auto-deploy enabled) independently.

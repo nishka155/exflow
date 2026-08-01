@@ -1,4 +1,8 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+
 import { PageHeader } from "@/components/shared/page-header";
 import {
   Tabs,
@@ -15,34 +19,53 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ExportExcelButton } from "@/components/modules/export-excel-button";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import {
-  getCustomerReport,
-  getTransporterReport,
-  getDelayReport,
-  getContainerUtilizationReport,
-  getRevenueReport,
-  getExportCountryReport,
-} from "@/lib/queries/reports";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api } from "@/lib/api/client";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-export default async function ReportsPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface ReportsData {
+  customers: { id: string; name: string; country: string | null; bookingCount: number; revenue: number }[];
+  transporters: { id: string; name: string; totalDispatches: number; delayed: number; reachedFactory: number }[];
+  delays: {
+    id: string;
+    truckNumber: string;
+    expectedFactoryArrival: string;
+    booking: { bookingNumber: string; customer: { name: string } };
+    transporter: { name: string };
+  }[];
+  containerUtilization: { containerSize: string; count: number; avgGrossWeight: number; avgNetWeight: number }[];
+  revenue: { month: string; total: number }[];
+  exportCountries: { country: string; bookings: number; revenue: number }[];
+}
 
-  const [customers, transporters, delays, utilization, revenue, countries] = await Promise.all([
-    getCustomerReport(user.organizationId),
-    getTransporterReport(user.organizationId),
-    getDelayReport(user.organizationId),
-    getContainerUtilizationReport(user.organizationId),
-    getRevenueReport(user.organizationId),
-    getExportCountryReport(user.organizationId),
-  ]);
+function ReportsPageContent() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["reports"],
+    queryFn: () => api.get<ReportsData>("/api/reports"),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <p className="py-16 text-center text-sm text-destructive">
+        Could not load reports. Please try again.
+      </p>
+    );
+  }
+
+  const { customers, transporters, delays, containerUtilization: utilization, revenue, exportCountries: countries } = data;
 
   return (
     <div>
-      <PageHeader title="Reports" description="Operational and financial reporting across every shipment." />
+      <PageHeader title="Reports" description="Operational and financial reporting across every booking." />
 
       <Tabs defaultValue="customer">
         <TabsList>
@@ -64,7 +87,7 @@ export default async function ReportsPage() {
                 <TableRow>
                   <TableHead>Customer</TableHead>
                   <TableHead>Country</TableHead>
-                  <TableHead className="text-right">Shipments</TableHead>
+                  <TableHead className="text-right">Bookings</TableHead>
                   <TableHead className="text-right">Revenue (Completed)</TableHead>
                 </TableRow>
               </TableHeader>
@@ -73,7 +96,7 @@ export default async function ReportsPage() {
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.name}</TableCell>
                     <TableCell>{c.country}</TableCell>
-                    <TableCell className="text-right">{c.shipmentCount}</TableCell>
+                    <TableCell className="text-right">{c.bookingCount}</TableCell>
                     <TableCell className="text-right">{currency.format(c.revenue)}</TableCell>
                   </TableRow>
                 ))}
@@ -115,10 +138,10 @@ export default async function ReportsPage() {
             <ExportExcelButton
               data={delays.map((d) => ({
                 truckNumber: d.truckNumber,
-                shipment: d.shipment.shipmentNumber,
-                customer: d.shipment.customer.name,
+                booking: d.booking.bookingNumber,
+                customer: d.booking.customer.name,
                 transporter: d.transporter.name,
-                expectedArrival: d.expectedFactoryArrival.toISOString().slice(0, 10),
+                expectedArrival: d.expectedFactoryArrival.slice(0, 10),
               }))}
               filename="delay-report"
             />
@@ -128,7 +151,7 @@ export default async function ReportsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Truck</TableHead>
-                  <TableHead>Shipment</TableHead>
+                  <TableHead>Booking</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Transporter</TableHead>
                   <TableHead>Expected Arrival</TableHead>
@@ -138,8 +161,8 @@ export default async function ReportsPage() {
                 {delays.map((d) => (
                   <TableRow key={d.id}>
                     <TableCell className="font-medium">{d.truckNumber}</TableCell>
-                    <TableCell>{d.shipment.shipmentNumber}</TableCell>
-                    <TableCell>{d.shipment.customer.name}</TableCell>
+                    <TableCell>{d.booking.bookingNumber}</TableCell>
+                    <TableCell>{d.booking.customer.name}</TableCell>
                     <TableCell>{d.transporter.name}</TableCell>
                     <TableCell>
                       {new Date(d.expectedFactoryArrival).toLocaleDateString()}
@@ -212,7 +235,7 @@ export default async function ReportsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Country</TableHead>
-                  <TableHead className="text-right">Shipments</TableHead>
+                  <TableHead className="text-right">Bookings</TableHead>
                   <TableHead className="text-right">Revenue</TableHead>
                 </TableRow>
               </TableHeader>
@@ -220,7 +243,7 @@ export default async function ReportsPage() {
                 {countries.map((c) => (
                   <TableRow key={c.country}>
                     <TableCell className="font-medium">{c.country}</TableCell>
-                    <TableCell className="text-right">{c.shipments}</TableCell>
+                    <TableCell className="text-right">{c.bookings}</TableCell>
                     <TableCell className="text-right">{currency.format(c.revenue)}</TableCell>
                   </TableRow>
                 ))}
@@ -230,5 +253,13 @@ export default async function ReportsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <AuthGuard>
+      <ReportsPageContent />
+    </AuthGuard>
   );
 }

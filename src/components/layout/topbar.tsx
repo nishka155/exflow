@@ -6,15 +6,13 @@ import { Search } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { NotificationBell, type NotificationItem } from "@/components/layout/notification-bell";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { AutoBreadcrumb } from "@/components/layout/auto-breadcrumb";
 
 export function Topbar({
   onOpenSearch,
-  notifications,
 }: {
   onOpenSearch?: () => void;
-  notifications: NotificationItem[];
 }) {
   const isMac =
     typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -40,7 +38,7 @@ export function Topbar({
           {isMac ? "⌘K" : "Ctrl K"}
         </kbd>
       </button>
-      <NotificationBell notifications={notifications} />
+      <NotificationBell />
       <ThemeToggle />
     </header>
   );

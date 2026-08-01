@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { Plus, Send } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Send, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -14,16 +17,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { listShippingInstructions } from "@/lib/queries/shipping-instructions";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api } from "@/lib/api/client";
 import { SI_STATUS_CONFIG, type SIStatus } from "@/lib/constants/statuses";
-import { redirect } from "next/navigation";
 
-export default async function ShippingInstructionsPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface SIListItem {
+  id: string;
+  shippingLine: string | null;
+  vessel: string | null;
+  voyage: string | null;
+  status: string;
+  booking: { bookingNumber: string; customer: { name: string } };
+}
 
-  const sis = await listShippingInstructions(user.organizationId);
+function ShippingInstructionsPageContent() {
+  const { data: sis, isLoading, error } = useQuery({
+    queryKey: ["shipping-instructions"],
+    queryFn: () => api.get<SIListItem[]>("/api/shipping-instructions"),
+  });
 
   return (
     <div>
@@ -38,7 +49,15 @@ export default async function ShippingInstructionsPage() {
         }
       />
 
-      {sis.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <p className="py-16 text-center text-sm text-destructive">
+          Could not load shipping instructions. Please try again.
+        </p>
+      ) : !sis || sis.length === 0 ? (
         <EmptyState
           icon={Send}
           title="No shipping instructions yet"
@@ -55,7 +74,7 @@ export default async function ShippingInstructionsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Shipment</TableHead>
+                <TableHead>Booking</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Shipping Line</TableHead>
                 <TableHead>Vessel / Voyage</TableHead>
@@ -65,8 +84,8 @@ export default async function ShippingInstructionsPage() {
             <TableBody>
               {sis.map((si) => (
                 <ClickableTableRow key={si.id} href={`/shipping-instructions/${si.id}`}>
-                  <TableCell className="font-medium">{si.shipment.shipmentNumber}</TableCell>
-                  <TableCell>{si.shipment.customer.name}</TableCell>
+                  <TableCell className="font-medium">{si.booking.bookingNumber}</TableCell>
+                  <TableCell>{si.booking.customer.name}</TableCell>
                   <TableCell>{si.shippingLine ?? "—"}</TableCell>
                   <TableCell>
                     {si.vessel ?? "—"} / {si.voyage ?? "—"}
@@ -81,5 +100,13 @@ export default async function ShippingInstructionsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ShippingInstructionsPage() {
+  return (
+    <AuthGuard>
+      <ShippingInstructionsPageContent />
+    </AuthGuard>
   );
 }

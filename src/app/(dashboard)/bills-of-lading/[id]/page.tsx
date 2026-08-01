@@ -1,6 +1,10 @@
-import { notFound, redirect } from "next/navigation";
+"use client";
+
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, FileDown, Pencil, History } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { AlertTriangle, FileDown, Pencil, History, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -8,12 +12,12 @@ import { DocumentList } from "@/components/shared/document-list";
 import { DocumentUploader } from "@/components/shared/document-uploader";
 import { FinalizeBLButton } from "@/components/modules/bill-of-lading-actions";
 import { GenerateReportButton } from "@/components/modules/generate-report-button";
+import { AuthGuard } from "@/components/auth/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { getBillOfLadingById } from "@/lib/queries/bills-of-lading";
-import { uploadBlDocumentAction, generateBlPdfAction } from "@/lib/actions/bills-of-lading";
+import { api, ApiError } from "@/lib/api/client";
 import { BL_STATUS_CONFIG, type BLStatus } from "@/lib/constants/statuses";
+import type { Document } from "@prisma/client";
 
 interface Mismatch {
   field: string;
@@ -22,26 +26,80 @@ interface Mismatch {
   siValue: string;
 }
 
-export default async function BillOfLadingDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface BLDetail {
+  id: string;
+  blNumber: string | null;
+  consignorName: string;
+  consigneeName: string;
+  notifyPartyName: string | null;
+  pol: string;
+  pod: string;
+  vessel: string | null;
+  voyage: string | null;
+  containerNumber: string | null;
+  sealNumber: string | null;
+  commodity: string;
+  packageCount: number | null;
+  weight: string | null;
+  freightTerms: string | null;
+  status: string;
+  pdfUrl: string | null;
+  mismatchNotes: unknown;
+  createdAt: string;
+  bookingId: string;
+  shippingInstructionId: string;
+  booking: { bookingNumber: string; customer: { name: string } };
+  revisions: { id: string; revisionNumber: number; changeNote: string | null; createdAt: string }[];
+  documents: Document[];
+}
 
-  const bl = await getBillOfLadingById(id, user.organizationId);
-  if (!bl) notFound();
+function BillOfLadingDetailPageContent() {
+  const params = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
 
-  const uploadAction = uploadBlDocumentAction.bind(null, bl.id);
-  const mismatches = (bl.mismatchNotes as unknown as Mismatch[] | null) ?? [];
+  const { data: bl, isLoading, error } = useQuery({
+    queryKey: ["bill-of-lading", params.id],
+    queryFn: () => api.get<BLDetail>(`/api/bills-of-lading/${params.id}`),
+  });
+
+  async function uploadDocument(formData: FormData) {
+    try {
+      await api.post(`/api/bills-of-lading/${params.id}/documents`, formData);
+      queryClient.invalidateQueries({ queryKey: ["bill-of-lading", params.id] });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Upload failed");
+      throw err;
+    }
+  }
+
+  async function handleDownloadPdf() {
+    try {
+      const { url } = await api.get<{ url: string }>(`/api/bills-of-lading/${params.id}/pdf`);
+      window.open(url, "_blank");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not download PDF");
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error || !bl) {
+    return <p className="py-16 text-center text-sm text-destructive">Bill of Lading not found.</p>;
+  }
+
+  const mismatches = (bl.mismatchNotes as Mismatch[] | null) ?? [];
 
   return (
     <div>
       <PageHeader
-        title={bl.blNumber ? `BL ${bl.blNumber}` : `BL Draft · ${bl.shipment.shipmentNumber}`}
-        description={bl.shipment.customer.name}
+        title={bl.blNumber ? `BL ${bl.blNumber}` : `BL Draft · ${bl.booking.bookingNumber}`}
+        description={bl.booking.customer.name}
         actions={<StatusBadge config={BL_STATUS_CONFIG[bl.status as BLStatus]} />}
       />
 
@@ -78,17 +136,14 @@ export default async function BillOfLadingDetailPage({
           </Button>
         )}
         <GenerateReportButton
-          action={generateBlPdfAction.bind(null, bl.id)}
+          action={() => api.post(`/api/bills-of-lading/${bl.id}/pdf`)}
           hasReport={!!bl.pdfUrl}
           label="Generate PDF"
           regenerateLabel="Regenerate PDF"
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ["bill-of-lading", bl.id] })}
         />
         {bl.pdfUrl && (
-          <Button
-            variant="outline"
-            nativeButton={false}
-            render={<a href={`/api/bills-of-lading/${bl.id}/pdf`} target="_blank" />}
-          >
+          <Button variant="outline" onClick={handleDownloadPdf}>
             <FileDown />
             Download PDF
           </Button>
@@ -121,10 +176,10 @@ export default async function BillOfLadingDetailPage({
           </CardHeader>
           <CardContent className="space-y-3">
             <Field
-              label="Shipment"
+              label="Booking"
               value={
-                <Link href={`/shipments/${bl.shipmentId}`} className="text-brand hover:underline">
-                  {bl.shipment.shipmentNumber}
+                <Link href={`/bookings/${bl.bookingId}`} className="text-brand hover:underline">
+                  {bl.booking.bookingNumber}
                 </Link>
               }
             />
@@ -150,7 +205,7 @@ export default async function BillOfLadingDetailPage({
             <CardTitle className="text-sm font-medium">Documents</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <DocumentUploader action={uploadAction} />
+            <DocumentUploader action={uploadDocument} />
             <DocumentList documents={bl.documents} />
           </CardContent>
         </Card>
@@ -192,5 +247,13 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-sm">{value}</p>
     </div>
+  );
+}
+
+export default function BillOfLadingDetailPage() {
+  return (
+    <AuthGuard>
+      <BillOfLadingDetailPageContent />
+    </AuthGuard>
   );
 }

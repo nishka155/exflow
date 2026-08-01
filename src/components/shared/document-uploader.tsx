@@ -9,8 +9,12 @@ import { cn } from "@/lib/utils";
 
 export function DocumentUploader({
   action,
+  category,
+  label,
 }: {
   action: (formData: FormData) => Promise<void>;
+  category?: string;
+  label?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
@@ -21,6 +25,7 @@ export function DocumentUploader({
   function uploadFile(file: File) {
     const formData = new FormData();
     formData.append("file", file);
+    if (category) formData.append("category", category);
     startTransition(async () => {
       try {
         await action(formData);
@@ -102,7 +107,9 @@ export function DocumentUploader({
         <>
           <UploadCloud className="size-6 text-muted-foreground" />
           <p className="text-sm">
-            <span className="font-medium text-foreground">Click to upload</span>{" "}
+            <span className="font-medium text-foreground">
+              {label ?? "Click to upload"}
+            </span>{" "}
             <span className="text-muted-foreground">or drag and drop</span>
           </p>
           <p className="text-xs text-muted-foreground">PDF, images, or documents</p>

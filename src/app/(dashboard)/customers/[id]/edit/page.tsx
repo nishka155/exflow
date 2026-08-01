@@ -1,31 +1,62 @@
-import { notFound, redirect } from "next/navigation";
+"use client";
+
+import { useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+
 import { PageHeader } from "@/components/shared/page-header";
 import { CustomerForm } from "@/components/modules/customer-form";
 import { PortalAccessCard } from "@/components/modules/portal-access-card";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { updateCustomerAction } from "@/lib/actions/customers";
-import { prisma } from "@/lib/prisma";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api } from "@/lib/api/client";
 
-export default async function EditCustomerPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface CustomerDetail {
+  id: string;
+  name: string;
+  code: string | null;
+  address: string | null;
+  city: string | null;
+  country: string;
+  gstNumber: string | null;
+  contactPerson: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  portalUser: { email: string } | null;
+}
 
-  const customer = await prisma.customer.findFirst({
-    where: { id, organizationId: user.organizationId },
-    include: { portalUser: { select: { email: true } } },
+function EditCustomerPageContent() {
+  const params = useParams<{ id: string }>();
+
+  const { data: customer, isLoading, error } = useQuery({
+    queryKey: ["customer", params.id],
+    queryFn: () => api.get<CustomerDetail>(`/api/customers/${params.id}`),
   });
-  if (!customer) notFound();
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error || !customer) {
+    return <p className="py-16 text-center text-sm text-destructive">Customer not found.</p>;
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader title={`Edit ${customer.name}`} />
-      <CustomerForm customer={customer} action={updateCustomerAction.bind(null, customer.id)} />
+      <CustomerForm customer={customer} />
       <PortalAccessCard customerId={customer.id} portalUserEmail={customer.portalUser?.email ?? null} />
     </div>
+  );
+}
+
+export default function EditCustomerPage() {
+  return (
+    <AuthGuard>
+      <EditCustomerPageContent />
+    </AuthGuard>
   );
 }

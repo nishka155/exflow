@@ -1,31 +1,48 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+
 import { PageHeader } from "@/components/shared/page-header";
 import { DispatchForm } from "@/components/modules/dispatch-form";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { listShipmentOptions } from "@/lib/queries/dispatches";
-import { prisma } from "@/lib/prisma";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api } from "@/lib/api/client";
+import type { Transporter, Booking, Customer, Invoice } from "@prisma/client";
 
-export default async function NewDispatchPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ shipmentId?: string }>;
-}) {
-  const { shipmentId } = await searchParams;
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+type BookingOption = Booking & { customer: Customer; invoice: Invoice | null };
 
-  const [shipments, transporters] = await Promise.all([
-    listShipmentOptions(user.organizationId),
-    prisma.transporter.findMany({
-      where: { organizationId: user.organizationId },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+function NewDispatchPageContent() {
+  const searchParams = useSearchParams();
+  const bookingId = searchParams.get("bookingId") ?? undefined;
+
+  const { data: bookings, isLoading: bookingsLoading } = useQuery({
+    queryKey: ["bookings"],
+    queryFn: () => api.get<BookingOption[]>("/api/bookings"),
+  });
+  const { data: transporters, isLoading: transportersLoading } = useQuery({
+    queryKey: ["transporters"],
+    queryFn: () => api.get<Transporter[]>("/api/transporters"),
+  });
 
   return (
     <div>
       <PageHeader title="New Truck Dispatch" description="Step 2 of the export workflow." />
-      <DispatchForm shipments={shipments} transporters={transporters} defaultShipmentId={shipmentId} />
+      {bookingsLoading || transportersLoading || !bookings || !transporters ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <DispatchForm bookings={bookings} transporters={transporters} defaultBookingId={bookingId} />
+      )}
     </div>
+  );
+}
+
+export default function NewDispatchPage() {
+  return (
+    <AuthGuard>
+      <NewDispatchPageContent />
+    </AuthGuard>
   );
 }

@@ -1,12 +1,14 @@
-import { redirect } from "next/navigation";
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProfileForm } from "@/components/modules/profile-form";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { ROLE_LABELS } from "@/lib/constants/roles";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { useAuthStore } from "@/lib/store/auth-store";
+import { ROLE_LABELS, type Role } from "@/lib/constants/roles";
 
-export default async function ProfilePage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+function ProfilePageContent() {
+  const user = useAuthStore((s) => s.user);
+  if (!user) return null;
 
   return (
     <Card>
@@ -20,10 +22,18 @@ export default async function ProfilePage() {
         </div>
         <div className="grid gap-1 text-sm">
           <p className="text-muted-foreground">Role</p>
-          <p>{ROLE_LABELS[user.role]}</p>
+          <p>{ROLE_LABELS[user.role as Role]}</p>
         </div>
         <ProfileForm name={user.name} phone="" />
       </CardContent>
     </Card>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <AuthGuard>
+      <ProfilePageContent />
+    </AuthGuard>
   );
 }

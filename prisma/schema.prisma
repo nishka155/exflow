@@ -67,13 +67,19 @@ enum BLStatus {
   FINAL
 }
 
-enum ShipmentStage {
+enum SobStatus {
+  PENDING
+  COMPLETED
+}
+
+enum BookingStage {
   INVOICE
   DISPATCH
   STUFFING
   GATE_IN
   SHIPPING_INSTRUCTION
   BILL_OF_LADING
+  SOB
   COMPLETED
 }
 
@@ -86,6 +92,9 @@ enum DocumentCategory {
   GR_COPY
   GATE_PASS
   PHOTO
+  CONTAINER_PHOTO
+  LOADING_PHOTO
+  SEAL_PHOTO
   VIDEO
   CERTIFICATE
   STUFFING_REPORT
@@ -93,7 +102,7 @@ enum DocumentCategory {
 }
 
 enum DocumentEntityType {
-  SHIPMENT
+  BOOKING
   INVOICE
   DISPATCH
   STUFFING
@@ -140,13 +149,14 @@ model Organization {
   users                User[]
   customers            Customer[]
   transporters         Transporter[]
-  shipments            Shipment[]
+  bookings             Booking[]
   invoices             Invoice[]
   truckDispatches      TruckDispatch[]
   factoryStuffings     FactoryStuffing[]
   gateIns              GateIn[]
   shippingInstructions ShippingInstruction[]
   billsOfLading        BillOfLading[]
+  shippedOnBoards      ShippedOnBoard[]
   documents            Document[]
   notifications        Notification[]
   auditLogs            AuditLog[]
@@ -167,18 +177,19 @@ model User {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  customerProfile   Customer?               @relation("CustomerPortalUser")
-  createdInvoices   Invoice[]               @relation("InvoiceCreatedBy")
-  createdDispatches TruckDispatch[]         @relation("DispatchCreatedBy")
-  createdStuffings  FactoryStuffing[]       @relation("StuffingCreatedBy")
-  createdGateIns    GateIn[]                @relation("GateInCreatedBy")
-  createdSIs        ShippingInstruction[]   @relation("SICreatedBy")
-  createdBLs        BillOfLading[]          @relation("BLCreatedBy")
-  uploadedDocuments Document[]              @relation("DocumentUploadedBy")
-  comments          ShipmentComment[]
+  customerProfile   Customer?              @relation("CustomerPortalUser")
+  createdInvoices   Invoice[]              @relation("InvoiceCreatedBy")
+  createdDispatches TruckDispatch[]        @relation("DispatchCreatedBy")
+  createdStuffings  FactoryStuffing[]      @relation("StuffingCreatedBy")
+  createdGateIns    GateIn[]               @relation("GateInCreatedBy")
+  createdSIs        ShippingInstruction[]  @relation("SICreatedBy")
+  createdBLs        BillOfLading[]         @relation("BLCreatedBy")
+  createdSobs       ShippedOnBoard[]       @relation("SobCreatedBy")
+  uploadedDocuments Document[]             @relation("DocumentUploadedBy")
+  comments          BookingComment[]
   notifications     Notification[]
   auditLogs         AuditLog[]
-  timelineEvents    ShipmentTimelineEvent[]
+  timelineEvents    BookingTimelineEvent[]
   authTokens        AuthToken[]
 
   @@index([organizationId])
@@ -227,8 +238,8 @@ model Customer {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  shipments Shipment[]
-  invoices  Invoice[]
+  bookings Booking[]
+  invoices Invoice[]
 
   @@index([organizationId])
   @@map("customers")
@@ -254,67 +265,80 @@ model Transporter {
 }
 
 // ---------------------------------------------------------------------------
-// Shipment master record
+// Booking master record
 // ---------------------------------------------------------------------------
 
-/// The single digital record a shipment's Invoice → Dispatch → Stuffing →
-/// Gate-In → SI → BL pipeline all attach to. One shipment == one container /
-/// one export pipeline instance.
-model Shipment {
-  id             String        @id @default(uuid())
+/// The single digital record a booking's Invoice → Dispatch → Stuffing →
+/// Gate-In → SI → BL → SOB pipeline all attach to. One booking can now carry
+/// multiple containers (FactoryStuffing rows) and multiple gate-ins.
+model Booking {
+  id             String       @id @default(uuid())
   organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  shipmentNumber String        @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bookingNumber  String       @unique
+  bookingDate    DateTime     @default(now())
   customerId     String
-  customer       Customer      @relation(fields: [customerId], references: [id])
-  currentStage   ShipmentStage @default(INVOICE)
-  isDelayed      Boolean       @default(false)
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  exporterName   String?
+  buyerName      String?
+  pol            String?
+  pod            String?
+  shippingLine   String?
+  vessel         String?
+  etd            DateTime?
+  eta            DateTime?
+  freightTerms   String?
+  commodity      String?
+  currentStage   BookingStage @default(INVOICE)
+  deliveryDate   DateTime?
+  isDelayed      Boolean      @default(false)
   createdById    String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   invoice             Invoice?
   truckDispatches     TruckDispatch[]
-  factoryStuffing     FactoryStuffing?
-  gateIn              GateIn?
+  factoryStuffings    FactoryStuffing[]
+  gateIns             GateIn[]
   shippingInstruction ShippingInstruction?
   billOfLading        BillOfLading?
+  sob                 ShippedOnBoard?
   documents           Document[]
-  comments            ShipmentComment[]
-  timelineEvents      ShipmentTimelineEvent[]
+  comments            BookingComment[]
+  timelineEvents      BookingTimelineEvent[]
 
   @@index([organizationId])
   @@index([customerId])
-  @@map("shipments")
+  @@map("bookings")
 }
 
-model ShipmentTimelineEvent {
-  id          String        @id @default(uuid())
-  shipmentId  String
-  shipment    Shipment      @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  stage       ShipmentStage
+model BookingTimelineEvent {
+  id          String       @id @default(uuid())
+  bookingId   String
+  booking     Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  stage       BookingStage
   title       String
   description String?
-  occurredAt  DateTime      @default(now())
+  occurredAt  DateTime     @default(now())
   actorId     String?
-  actor       User?         @relation(fields: [actorId], references: [id])
-  createdAt   DateTime      @default(now())
+  actor       User?        @relation(fields: [actorId], references: [id])
+  createdAt   DateTime     @default(now())
 
-  @@index([shipmentId])
-  @@map("shipment_timeline_events")
+  @@index([bookingId])
+  @@map("booking_timeline_events")
 }
 
-model ShipmentComment {
-  id         String   @id @default(uuid())
-  shipmentId String
-  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  authorId   String
-  author     User     @relation(fields: [authorId], references: [id])
-  body       String
-  createdAt  DateTime @default(now())
+model BookingComment {
+  id        String   @id @default(uuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
 
-  @@index([shipmentId])
-  @@map("shipment_comments")
+  @@index([bookingId])
+  @@map("booking_comments")
 }
 
 // ---------------------------------------------------------------------------
@@ -325,8 +349,8 @@ model Invoice {
   id             String       @id @default(uuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  shipmentId     String       @unique
-  shipment       Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  bookingId      String       @unique
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   invoiceNumber  String
   invoiceDate    DateTime
@@ -387,8 +411,8 @@ model TruckDispatch {
   id             String       @id @default(uuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  shipmentId     String
-  shipment       Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  bookingId      String
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   truckNumber            String
   driverName             String
@@ -397,6 +421,7 @@ model TruckDispatch {
   transporter            Transporter    @relation(fields: [transporterId], references: [id])
   material               String
   referenceNumber        String?
+  lrNumber               String?
   numberOfWeights        Decimal?       @db.Decimal(14, 3)
   numberOfBlocks         Int?
   dispatchDate           DateTime
@@ -414,33 +439,38 @@ model TruckDispatch {
   documents         Document[]
 
   @@index([organizationId])
-  @@index([shipmentId])
+  @@index([bookingId])
   @@index([transporterId])
   @@map("truck_dispatches")
 }
 
 // ---------------------------------------------------------------------------
-// Step 3 — Factory Stuffing
+// Step 3 — Factory Stuffing (one row per container; unlimited per booking)
 // ---------------------------------------------------------------------------
 
 model FactoryStuffing {
   id             String       @id @default(uuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  shipmentId     String       @unique
-  shipment       Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  bookingId      String
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   containerNumber   String
   containerSize     ContainerSize
   sealNumber        String?
+  contactPerson     String?
   contactNumber     String?
   transporterId     String?
   transporter       Transporter?  @relation(fields: [transporterId], references: [id])
   pol               String
   pod               String
   numberOfBoxes     Int?
+  numberOfBlocks    Int?
   grossWeight       Decimal?      @db.Decimal(14, 3)
   netWeight         Decimal?      @db.Decimal(14, 3)
+  lrGrNumber        String?
+  deliveryDate      DateTime?
+  actualArrival     DateTime?
   stuffingStartTime DateTime?
   stuffingEndTime   DateTime?
 
@@ -449,6 +479,7 @@ model FactoryStuffing {
   checklistSealApplied       Boolean @default(false)
   checklistDocumentsUploaded Boolean @default(false)
 
+  remarks   String?
   status    StuffingStatus @default(SCHEDULED)
   reportUrl String?
 
@@ -462,19 +493,20 @@ model FactoryStuffing {
   documents       Document[]
 
   @@index([organizationId])
+  @@index([bookingId])
   @@map("factory_stuffings")
 }
 
 // ---------------------------------------------------------------------------
-// Step 4 — Gate In
+// Step 4 — Gate In (one per container, so many per booking)
 // ---------------------------------------------------------------------------
 
 model GateIn {
   id                String          @id @default(uuid())
   organizationId    String
   organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  shipmentId        String          @unique
-  shipment          Shipment        @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  bookingId         String
+  booking           Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   factoryStuffingId String          @unique
   factoryStuffing   FactoryStuffing @relation(fields: [factoryStuffingId], references: [id], onDelete: Cascade)
 
@@ -497,6 +529,7 @@ model GateIn {
   documents Document[]
 
   @@index([organizationId])
+  @@index([bookingId])
   @@map("gate_ins")
 }
 
@@ -508,8 +541,8 @@ model ShippingInstruction {
   id             String       @id @default(uuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  shipmentId     String       @unique
-  shipment       Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  bookingId      String       @unique
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   consignorName      String
   consignorAddress   String?
@@ -555,8 +588,8 @@ model BillOfLading {
   id                    String              @id @default(uuid())
   organizationId        String
   organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  shipmentId            String              @unique
-  shipment              Shipment            @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  bookingId             String              @unique
+  booking               Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   shippingInstructionId String              @unique
   shippingInstruction   ShippingInstruction @relation(fields: [shippingInstructionId], references: [id], onDelete: Cascade)
 
@@ -589,6 +622,7 @@ model BillOfLading {
 
   revisions BLRevision[]
   documents Document[]
+  sob       ShippedOnBoard?
 
   @@index([organizationId])
   @@map("bills_of_lading")
@@ -609,6 +643,34 @@ model BLRevision {
 }
 
 // ---------------------------------------------------------------------------
+// Step 7 — Shipped On Board (created once the BL is finalized)
+// ---------------------------------------------------------------------------
+
+model ShippedOnBoard {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bookingId      String       @unique
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  billOfLadingId String       @unique
+  billOfLading   BillOfLading @relation(fields: [billOfLadingId], references: [id], onDelete: Cascade)
+
+  vessel       String?
+  shippingLine String?
+  sobDate      DateTime?
+  remarks      String?
+  status       SobStatus @default(PENDING)
+
+  createdById String?
+  createdBy   User?    @relation("SobCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("shipped_on_boards")
+}
+
+// ---------------------------------------------------------------------------
 // Documents (shared across every module)
 // ---------------------------------------------------------------------------
 
@@ -616,8 +678,8 @@ model Document {
   id             String       @id @default(uuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  shipmentId     String?
-  shipment       Shipment?    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  bookingId      String?
+  booking        Booking?     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   entityType        String
   category          DocumentCategory
@@ -649,7 +711,7 @@ model Document {
   billOfLading          BillOfLading?        @relation(fields: [billOfLadingId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
-  @@index([shipmentId])
+  @@index([bookingId])
   @@map("documents")
 }
 

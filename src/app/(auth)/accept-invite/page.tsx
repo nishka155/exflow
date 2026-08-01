@@ -27,13 +27,8 @@ function AcceptInviteForm() {
   const mutation = useMutation({
     mutationFn: (password: string) =>
       api.post<AcceptInviteResponse>("/api/auth/accept-invite", { token, password }),
-    onSuccess: async (data, password) => {
+    onSuccess: (data) => {
       setAuth(data.token, data.user);
-      await fetch("/api/auth/bridge-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: data.user.email, password }),
-      });
       router.push(data.user.role === "CUSTOMER" ? "/portal" : "/dashboard");
     },
     onError: (err) => {

@@ -23,20 +23,12 @@ export default function SignUpPage() {
   const [error, setError] = React.useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: async (values: {
+    mutationFn: (values: {
       organizationName: string;
       name: string;
       email: string;
       password: string;
-    }) => {
-      const data = await api.post<SignUpResponse>("/api/auth/signup", values);
-      await fetch("/api/auth/bridge-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: values.email, password: values.password }),
-      });
-      return data;
-    },
+    }) => api.post<SignUpResponse>("/api/auth/signup", values),
     onSuccess: (data) => {
       setAuth(data.token, data.user);
       router.push("/dashboard");

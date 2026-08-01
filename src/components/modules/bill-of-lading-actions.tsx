@@ -1,16 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { finalizeBillOfLadingAction } from "@/lib/actions/bills-of-lading";
+import { api, ApiError } from "@/lib/api/client";
 import type { BLStatus } from "@/lib/constants/statuses";
 
 export function FinalizeBLButton({ blId, status }: { blId: string; status: BLStatus }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [pending, startTransition] = React.useTransition();
 
   if (status === "FINAL") return null;
@@ -18,11 +18,12 @@ export function FinalizeBLButton({ blId, status }: { blId: string; status: BLSta
   function handleClick() {
     startTransition(async () => {
       try {
-        await finalizeBillOfLadingAction(blId);
+        await api.post(`/api/bills-of-lading/${blId}/finalize`);
+        queryClient.invalidateQueries({ queryKey: ["bill-of-lading", blId] });
+        queryClient.invalidateQueries({ queryKey: ["bills-of-lading"] });
         toast.success("Bill of Lading finalized");
-        router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Something went wrong");
+        toast.error(err instanceof ApiError ? err.message : "Something went wrong");
       }
     });
   }

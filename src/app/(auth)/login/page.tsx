@@ -26,17 +26,8 @@ function LoginForm() {
   const [error, setError] = React.useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: async (values: { email: string; password: string }) => {
-      const data = await api.post<LoginResponse>("/api/auth/login", values);
-      // Also establish the legacy NextAuth cookie session so not-yet-migrated
-      // modules keep working for this user during the hybrid rollout.
-      await fetch("/api/auth/bridge-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
-      return data;
-    },
+    mutationFn: (values: { email: string; password: string }) =>
+      api.post<LoginResponse>("/api/auth/login", values),
     onSuccess: (data) => {
       setAuth(data.token, data.user);
       router.push("/dashboard");

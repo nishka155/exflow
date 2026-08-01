@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { Plus, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Users, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -13,17 +16,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api } from "@/lib/api/client";
 
-export default async function CustomersPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface CustomerListItem {
+  id: string;
+  name: string;
+  country: string;
+  contactPerson: string | null;
+  contactEmail: string | null;
+}
 
-  const customers = await prisma.customer.findMany({
-    where: { organizationId: user.organizationId },
-    orderBy: { name: "asc" },
+function CustomersPageContent() {
+  const { data: customers, isLoading, error } = useQuery({
+    queryKey: ["customers"],
+    queryFn: () => api.get<CustomerListItem[]>("/api/customers"),
   });
 
   return (
@@ -39,7 +46,15 @@ export default async function CustomersPage() {
         }
       />
 
-      {customers.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <p className="py-16 text-center text-sm text-destructive">
+          Could not load customers. Please try again.
+        </p>
+      ) : !customers || customers.length === 0 ? (
         <EmptyState
           icon={Users}
           title="No customers yet"
@@ -76,5 +91,13 @@ export default async function CustomersPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CustomersPage() {
+  return (
+    <AuthGuard>
+      <CustomersPageContent />
+    </AuthGuard>
   );
 }

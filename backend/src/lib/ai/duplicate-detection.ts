@@ -4,7 +4,7 @@ import { prisma } from "../prisma";
  * Heuristic duplicate-invoice detection: same customer + same material,
  * raised within a week of each other, with a total amount within 10% of
  * one another. No ML — just a similarity rule of thumb to catch accidental
- * re-entry (e.g. a data-entry clerk re-keying the same shipment twice).
+ * re-entry (e.g. a data-entry clerk re-keying the same booking twice).
  */
 export async function findPossibleDuplicateInvoices(invoiceId: string) {
   const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId } });

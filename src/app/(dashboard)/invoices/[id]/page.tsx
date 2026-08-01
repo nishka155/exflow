@@ -42,9 +42,9 @@ interface InvoiceDetail {
   pdfUrl: string | null;
   createdAt: string;
   updatedAt: string;
-  shipmentId: string;
+  bookingId: string;
   customer: { name: string };
-  shipment: { shipmentNumber: string };
+  booking: { bookingNumber: string };
   createdBy: { name: string } | null;
   versions: { id: string; versionNumber: number; changeNote: string | null; createdAt: string }[];
   documents: Document[];
@@ -86,7 +86,7 @@ function InvoiceDetailPageContent() {
     <div>
       <PageHeader
         title={invoice.invoiceNumber}
-        description={`Shipment ${invoice.shipment.shipmentNumber}`}
+        description={`Booking ${invoice.booking.bookingNumber}`}
         actions={<StatusBadge config={INVOICE_STATUS_CONFIG[invoice.status as InvoiceStatus]} />}
       />
 
@@ -162,13 +162,13 @@ function InvoiceDetailPageContent() {
             <Field label="Created" value={new Date(invoice.createdAt).toLocaleString()} />
             <Field label="Last Updated" value={new Date(invoice.updatedAt).toLocaleString()} />
             <Field
-              label="Shipment"
+              label="Booking"
               value={
                 <Link
-                  href={`/shipments/${invoice.shipmentId}`}
+                  href={`/bookings/${invoice.bookingId}`}
                   className="text-brand hover:underline"
                 >
-                  {invoice.shipment.shipmentNumber}
+                  {invoice.booking.bookingNumber}
                 </Link>
               }
             />

@@ -1,6 +1,10 @@
+"use client";
+
 import { FileText, Download } from "lucide-react";
+import { toast } from "sonner";
 import type { Document } from "@prisma/client";
 import { EmptyState } from "@/components/shared/empty-state";
+import { api, ApiError } from "@/lib/api/client";
 
 function formatBytes(bytes: number | null) {
   if (!bytes) return "";
@@ -10,6 +14,15 @@ function formatBytes(bytes: number | null) {
 }
 
 export function DocumentList({ documents }: { documents: Document[] }) {
+  async function handleDownload(id: string) {
+    try {
+      const { url } = await api.get<{ url: string }>(`/api/documents/${id}/download`);
+      window.open(url, "_blank");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not download file");
+    }
+  }
+
   if (documents.length === 0) {
     return (
       <EmptyState
@@ -33,14 +46,13 @@ export function DocumentList({ documents }: { documents: Document[] }) {
               </p>
             </div>
           </div>
-          <a
-            href={`/api/documents/${doc.id}/download`}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
+            onClick={() => handleDownload(doc.id)}
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >
             <Download className="size-4" />
-          </a>
+          </button>
         </li>
       ))}
     </ul>

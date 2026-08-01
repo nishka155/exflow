@@ -9,27 +9,13 @@ import { invoiceSchema, computeInvoiceTotals } from "../lib/validations/invoice"
 import { uploadDocumentFile, getSignedDownloadUrl } from "../lib/storage/s3";
 import { generateInvoicePdf } from "../lib/pdf/generate-invoice-pdf";
 import { findPossibleDuplicateInvoices } from "../lib/ai/duplicate-detection";
+import { generateNextBookingNumber } from "../lib/booking-number";
 import type { InvoiceStatus } from "../lib/constants/statuses";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.use(requireAuth, requireRole("invoices"));
-
-// Mirrors src/lib/queries/shipments.ts#generateNextShipmentNumber, but
-// collision-safe: shipmentNumber is a globally-unique column while the count
-// used to build it is scoped per-org, so once more than one org exists the
-// naive count-based candidate can already be taken by another org's shipment.
-async function generateNextShipmentNumber(organizationId: string) {
-  const year = new Date().getFullYear();
-  let count = await prisma.shipment.count({ where: { organizationId } });
-  let candidate = `EXF-${year}-${String(count + 1).padStart(6, "0")}`;
-  while (await prisma.shipment.findUnique({ where: { shipmentNumber: candidate } })) {
-    count += 1;
-    candidate = `EXF-${year}-${String(count + 1).padStart(6, "0")}`;
-  }
-  return candidate;
-}
 
 router.get("/", async (req, res, next) => {
   try {
@@ -49,7 +35,7 @@ router.get("/", async (req, res, next) => {
             }
           : {}),
       },
-      include: { customer: true, shipment: true },
+      include: { customer: true, booking: true },
       orderBy: { createdAt: "desc" },
     });
     res.json(invoices);
@@ -64,7 +50,7 @@ router.get("/:id", async (req, res, next) => {
       where: { id: req.params.id, organizationId: req.user!.organizationId },
       include: {
         customer: true,
-        shipment: true,
+        booking: true,
         createdBy: { select: { name: true } },
         versions: { orderBy: { versionNumber: "desc" } },
         documents: { orderBy: { createdAt: "desc" } },
@@ -96,12 +82,12 @@ router.post("/", async (req, res, next) => {
       throw new HttpError(409, `Invoice number ${data.invoiceNumber} already exists`);
     }
 
-    const shipmentNumber = await generateNextShipmentNumber(user.organizationId);
+    const bookingNumber = await generateNextBookingNumber(user.organizationId);
 
-    const shipment = await prisma.shipment.create({
+    const booking = await prisma.booking.create({
       data: {
         organizationId: user.organizationId,
-        shipmentNumber,
+        bookingNumber,
         customerId: data.customerId,
         currentStage: "INVOICE",
         createdById: user.id,
@@ -143,7 +129,7 @@ router.post("/", async (req, res, next) => {
       include: { invoice: true },
     });
 
-    res.status(201).json(shipment.invoice);
+    res.status(201).json(booking.invoice);
   } catch (err) {
     next(err);
   }
@@ -239,9 +225,9 @@ router.post("/:id/status", async (req, res, next) => {
 
     const [updated] = await prisma.$transaction([
       prisma.invoice.update({ where: { id: invoiceId }, data: { status: nextStatus } }),
-      prisma.shipmentTimelineEvent.create({
+      prisma.bookingTimelineEvent.create({
         data: {
-          shipmentId: invoice.shipmentId,
+          bookingId: invoice.bookingId,
           stage: "INVOICE",
           title: `Invoice ${nextStatus.toLowerCase()}`,
           actorId: user.id,
@@ -264,7 +250,7 @@ router.delete("/:id", async (req, res, next) => {
     if (invoice.status !== "DRAFT") {
       throw new HttpError(409, "Only draft invoices can be deleted");
     }
-    await prisma.shipment.delete({ where: { id: invoice.shipmentId } });
+    await prisma.booking.delete({ where: { id: invoice.bookingId } });
     res.status(204).end();
   } catch (err) {
     next(err);
@@ -319,7 +305,7 @@ router.post("/:id/documents", upload.single("file"), async (req, res, next) => {
     const document = await prisma.document.create({
       data: {
         organizationId: req.user!.organizationId,
-        shipmentId: invoice.shipmentId,
+        bookingId: invoice.bookingId,
         invoiceId: invoice.id,
         entityType: "INVOICE",
         category: "OTHER",

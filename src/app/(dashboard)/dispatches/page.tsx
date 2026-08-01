@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { Plus, Truck } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Truck, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -14,16 +17,25 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { listDispatches } from "@/lib/queries/dispatches";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api } from "@/lib/api/client";
 import { DISPATCH_STATUS_CONFIG, type DispatchStatus } from "@/lib/constants/statuses";
-import { redirect } from "next/navigation";
 
-export default async function DispatchesPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface DispatchListItem {
+  id: string;
+  truckNumber: string;
+  lrNumber: string | null;
+  status: string;
+  dispatchDate: string;
+  booking: { bookingNumber: string; customer: { name: string } };
+  transporter: { name: string };
+}
 
-  const dispatches = await listDispatches(user.organizationId);
+function DispatchesPageContent() {
+  const { data: dispatches, isLoading, error } = useQuery({
+    queryKey: ["dispatches"],
+    queryFn: () => api.get<DispatchListItem[]>("/api/dispatches"),
+  });
 
   return (
     <div>
@@ -38,11 +50,19 @@ export default async function DispatchesPage() {
         }
       />
 
-      {dispatches.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <p className="py-16 text-center text-sm text-destructive">
+          Could not load dispatches. Please try again.
+        </p>
+      ) : !dispatches || dispatches.length === 0 ? (
         <EmptyState
           icon={Truck}
           title="No dispatches yet"
-          description="Create a truck dispatch for one of your shipments."
+          description="Create a truck dispatch for one of your bookings."
           action={
             <Button nativeButton={false} render={<Link href="/dispatches/new" />}>
               <Plus />
@@ -56,7 +76,8 @@ export default async function DispatchesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Truck Number</TableHead>
-                <TableHead>Shipment</TableHead>
+                <TableHead>LR Number</TableHead>
+                <TableHead>Booking</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Transporter</TableHead>
                 <TableHead>Dispatch Date</TableHead>
@@ -67,8 +88,9 @@ export default async function DispatchesPage() {
               {dispatches.map((d) => (
                 <ClickableTableRow key={d.id} href={`/dispatches/${d.id}`}>
                   <TableCell className="font-medium">{d.truckNumber}</TableCell>
-                  <TableCell>{d.shipment.shipmentNumber}</TableCell>
-                  <TableCell>{d.shipment.customer.name}</TableCell>
+                  <TableCell>{d.lrNumber ?? "—"}</TableCell>
+                  <TableCell>{d.booking.bookingNumber}</TableCell>
+                  <TableCell>{d.booking.customer.name}</TableCell>
                   <TableCell>{d.transporter.name}</TableCell>
                   <TableCell>{new Date(d.dispatchDate).toLocaleDateString()}</TableCell>
                   <TableCell>
@@ -81,5 +103,13 @@ export default async function DispatchesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DispatchesPage() {
+  return (
+    <AuthGuard>
+      <DispatchesPageContent />
+    </AuthGuard>
   );
 }

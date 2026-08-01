@@ -12,11 +12,13 @@ export function GenerateReportButton({
   hasReport,
   label = "Generate Report",
   regenerateLabel = "Regenerate Report",
+  onSuccess,
 }: {
   action: () => Promise<void>;
   hasReport: boolean;
   label?: string;
   regenerateLabel?: string;
+  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
@@ -26,6 +28,7 @@ export function GenerateReportButton({
       try {
         await action();
         toast.success("Report generated");
+        onSuccess?.();
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Something went wrong");

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import * as React from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,18 +12,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { inviteUserAction, type ActionResult } from "@/lib/actions/profile";
+import { api, ApiError } from "@/lib/api/client";
 import { ROLE_LABELS, ROLES } from "@/lib/constants/roles";
 
 export function InviteUserForm() {
-  const [state, formAction, pending] = useActionState<ActionResult, FormData>(
-    inviteUserAction,
-    {}
-  );
+  const queryClient = useQueryClient();
+  const [error, setError] = React.useState<string | null>(null);
+  const [role, setRole] = React.useState("EXPORT_MANAGER");
   const invitableRoles = ROLES.filter((r) => r !== "CUSTOMER");
 
+  const mutation = useMutation({
+    mutationFn: (payload: { name: string; email: string; role: string }) =>
+      api.post("/api/profile/users/invite", payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspace-users"] });
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : "Something went wrong");
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const formData = new FormData(e.currentTarget);
+    mutation.mutate({
+      name: String(formData.get("name") ?? ""),
+      email: String(formData.get("email") ?? ""),
+      role,
+    });
+  }
+
   return (
-    <form action={formAction} className="grid gap-4 sm:grid-cols-2">
+    <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
       <div className="space-y-2">
         <Label htmlFor="name">Name</Label>
         <Input id="name" name="name" required />
@@ -33,7 +55,7 @@ export function InviteUserForm() {
       </div>
       <div className="space-y-2 sm:col-span-2">
         <Label htmlFor="role">Role</Label>
-        <Select name="role" defaultValue="EXPORT_MANAGER">
+        <Select value={role} onValueChange={(v) => v && setRole(v)}>
           <SelectTrigger id="role" className="w-full">
             <SelectValue>
               {(value: string | null) =>
@@ -50,13 +72,13 @@ export function InviteUserForm() {
           </SelectContent>
         </Select>
       </div>
-      {state.error && <p className="text-sm text-destructive sm:col-span-2">{state.error}</p>}
-      {state.success && (
+      {error && <p className="text-sm text-destructive sm:col-span-2">{error}</p>}
+      {mutation.isSuccess && (
         <p className="text-sm text-success sm:col-span-2">Invitation sent.</p>
       )}
       <div className="sm:col-span-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Sending…" : "Send Invite"}
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? "Sending…" : "Send Invite"}
         </Button>
       </div>
     </form>

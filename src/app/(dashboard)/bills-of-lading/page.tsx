@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { Plus, Ship } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Ship, Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -14,16 +17,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { listBillsOfLading } from "@/lib/queries/bills-of-lading";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api } from "@/lib/api/client";
 import { BL_STATUS_CONFIG, type BLStatus } from "@/lib/constants/statuses";
-import { redirect } from "next/navigation";
 
-export default async function BillsOfLadingPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+interface BLListItem {
+  id: string;
+  blNumber: string | null;
+  vessel: string | null;
+  voyage: string | null;
+  status: string;
+  booking: { bookingNumber: string; customer: { name: string } };
+}
 
-  const bls = await listBillsOfLading(user.organizationId);
+function BillsOfLadingPageContent() {
+  const { data: bls, isLoading, error } = useQuery({
+    queryKey: ["bills-of-lading"],
+    queryFn: () => api.get<BLListItem[]>("/api/bills-of-lading"),
+  });
 
   return (
     <div>
@@ -38,7 +49,15 @@ export default async function BillsOfLadingPage() {
         }
       />
 
-      {bls.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <p className="py-16 text-center text-sm text-destructive">
+          Could not load bills of lading. Please try again.
+        </p>
+      ) : !bls || bls.length === 0 ? (
         <EmptyState
           icon={Ship}
           title="No bills of lading yet"
@@ -56,7 +75,7 @@ export default async function BillsOfLadingPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>BL Number</TableHead>
-                <TableHead>Shipment</TableHead>
+                <TableHead>Booking</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Vessel / Voyage</TableHead>
                 <TableHead>Status</TableHead>
@@ -66,8 +85,8 @@ export default async function BillsOfLadingPage() {
               {bls.map((bl) => (
                 <ClickableTableRow key={bl.id} href={`/bills-of-lading/${bl.id}`}>
                   <TableCell className="font-medium">{bl.blNumber ?? "—"}</TableCell>
-                  <TableCell>{bl.shipment.shipmentNumber}</TableCell>
-                  <TableCell>{bl.shipment.customer.name}</TableCell>
+                  <TableCell>{bl.booking.bookingNumber}</TableCell>
+                  <TableCell>{bl.booking.customer.name}</TableCell>
                   <TableCell>
                     {bl.vessel ?? "—"} / {bl.voyage ?? "—"}
                   </TableCell>
@@ -81,5 +100,13 @@ export default async function BillsOfLadingPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function BillsOfLadingPage() {
+  return (
+    <AuthGuard>
+      <BillsOfLadingPageContent />
+    </AuthGuard>
   );
 }

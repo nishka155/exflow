@@ -1,35 +1,50 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { Ship } from "lucide-react";
+"use client";
 
-import { LogOut } from "lucide-react";
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { LogOut, Ship, Loader2 } from "lucide-react";
+
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { PortalNav } from "@/components/modules/portal-nav";
 import { Button } from "@/components/ui/button";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { getCustomerForPortalUser } from "@/lib/queries/customer-portal";
-import { signOutAction } from "@/lib/auth/actions";
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { useAuthStore } from "@/lib/store/auth-store";
+import { api } from "@/lib/api/client";
 
-export default async function PortalLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  if (user.role !== "CUSTOMER") redirect("/dashboard");
+interface PortalCustomer {
+  id: string;
+  name: string;
+}
 
-  const customer = await getCustomerForPortalUser(user.id);
-  if (!customer) notFound();
+function PortalLayoutContent({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const role = useAuthStore((s) => s.user?.role);
 
-  const notifications = await prisma.notification.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    take: 20,
+  React.useEffect(() => {
+    if (role && role !== "CUSTOMER") router.replace("/dashboard");
+  }, [role, router]);
+
+  const { data: customer, isLoading } = useQuery({
+    queryKey: ["portal-me"],
+    queryFn: () => api.get<PortalCustomer>("/api/portal/me"),
+    enabled: role === "CUSTOMER",
   });
+
+  function handleSignOut() {
+    useAuthStore.getState().clearAuth();
+    router.push("/login");
+  }
+
+  if (role !== "CUSTOMER" || isLoading || !customer) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -42,13 +57,11 @@ export default async function PortalLayout({
           <span className="text-sm text-muted-foreground">Customer Portal</span>
         </Link>
         <div className="flex-1" />
-        <NotificationBell notifications={notifications} />
+        <NotificationBell />
         <ThemeToggle />
-        <form action={signOutAction}>
-          <Button variant="ghost" size="icon" type="submit">
-            <LogOut className="size-4" />
-          </Button>
-        </form>
+        <Button variant="ghost" size="icon" onClick={handleSignOut}>
+          <LogOut className="size-4" />
+        </Button>
       </header>
       <div className="border-b px-4 sm:px-6">
         <PortalNav />
@@ -58,5 +71,13 @@ export default async function PortalLayout({
         {customer.name} · ExFlow Customer Portal
       </footer>
     </div>
+  );
+}
+
+export default function PortalLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthGuard>
+      <PortalLayoutContent>{children}</PortalLayoutContent>
+    </AuthGuard>
   );
 }

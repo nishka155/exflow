@@ -68,23 +68,32 @@ export const BL_STATUS_CONFIG: Record<BLStatus, StatusConfig> = {
   FINAL: { label: "Final", tone: "success" },
 };
 
-export const SHIPMENT_STAGE = [
+export const BOOKING_STAGE = [
   "INVOICE",
   "DISPATCH",
   "STUFFING",
   "GATE_IN",
   "SHIPPING_INSTRUCTION",
   "BILL_OF_LADING",
+  "SOB",
   "COMPLETED",
 ] as const;
-export type ShipmentStage = (typeof SHIPMENT_STAGE)[number];
-export const SHIPMENT_STAGE_CONFIG: Record<ShipmentStage, StatusConfig> = {
+export type BookingStage = (typeof BOOKING_STAGE)[number];
+export const BOOKING_STAGE_CONFIG: Record<BookingStage, StatusConfig> = {
   INVOICE: { label: "Invoice", tone: "neutral" },
   DISPATCH: { label: "Truck Dispatch", tone: "info" },
   STUFFING: { label: "Factory Stuffing", tone: "info" },
   GATE_IN: { label: "Gate In", tone: "info" },
   SHIPPING_INSTRUCTION: { label: "Shipping Instruction", tone: "warning" },
   BILL_OF_LADING: { label: "Bill of Lading", tone: "warning" },
+  SOB: { label: "Shipped on Board", tone: "warning" },
+  COMPLETED: { label: "Completed", tone: "success" },
+};
+
+export const SOB_STATUS = ["PENDING", "COMPLETED"] as const;
+export type SobStatus = (typeof SOB_STATUS)[number];
+export const SOB_STATUS_CONFIG: Record<SobStatus, StatusConfig> = {
+  PENDING: { label: "Pending", tone: "warning" },
   COMPLETED: { label: "Completed", tone: "success" },
 };
 

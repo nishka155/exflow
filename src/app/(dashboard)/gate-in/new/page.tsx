@@ -1,19 +1,40 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+
 import { PageHeader } from "@/components/shared/page-header";
 import { GateInForm } from "@/components/modules/gate-in-form";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { listStuffingsAwaitingGateIn } from "@/lib/queries/gate-in";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { api } from "@/lib/api/client";
+import type { FactoryStuffing, Booking, Customer } from "@prisma/client";
 
-export default async function NewGateInPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+type StuffingOption = FactoryStuffing & { booking: Booking & { customer: Customer } };
 
-  const stuffings = await listStuffingsAwaitingGateIn(user.organizationId);
+function NewGateInPageContent() {
+  const { data: stuffings, isLoading } = useQuery({
+    queryKey: ["stuffings", { awaitingGateIn: true }],
+    queryFn: () => api.get<StuffingOption[]>("/api/stuffing?awaitingGateIn=true"),
+  });
 
   return (
     <div>
       <PageHeader title="New Gate In" description="Step 4 of the export workflow." />
-      <GateInForm stuffings={stuffings} />
+      {isLoading || !stuffings ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <GateInForm stuffings={stuffings} />
+      )}
     </div>
+  );
+}
+
+export default function NewGateInPage() {
+  return (
+    <AuthGuard>
+      <NewGateInPageContent />
+    </AuthGuard>
   );
 }

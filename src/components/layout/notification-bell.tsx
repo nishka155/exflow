@@ -1,7 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -14,29 +13,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  markNotificationReadAction,
-  markAllNotificationsReadAction,
-} from "@/lib/actions/notifications";
+import { api } from "@/lib/api/client";
 
 export interface NotificationItem {
   id: string;
   title: string;
   body: string | null;
   isRead: boolean;
-  createdAt: Date | string;
+  createdAt: string;
 }
 
-export function NotificationBell({ notifications }: { notifications: NotificationItem[] }) {
-  const router = useRouter();
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+export function NotificationBell() {
+  const queryClient = useQueryClient();
+  const { data: notifications } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => api.get<NotificationItem[]>("/api/notifications"),
+  });
+
+  const items = notifications ?? [];
+  const unreadCount = items.filter((n) => !n.isRead).length;
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  }
 
   function handleClick(id: string) {
-    markNotificationReadAction(id).then(() => router.refresh());
+    api.post(`/api/notifications/${id}/read`).then(invalidate);
   }
 
   function handleMarkAll() {
-    markAllNotificationsReadAction().then(() => router.refresh());
+    api.post("/api/notifications/read-all").then(invalidate);
   }
 
   return (
@@ -63,14 +69,14 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        {notifications.length === 0 ? (
+        {items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-2 py-8 text-center">
             <BellOff className="size-5 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">You&apos;re all caught up</p>
           </div>
         ) : (
           <div className="max-h-80 overflow-y-auto">
-            {notifications.map((n) => (
+            {items.map((n) => (
               <DropdownMenuItem
                 key={n.id}
                 className="flex flex-col items-start gap-0.5 whitespace-normal"

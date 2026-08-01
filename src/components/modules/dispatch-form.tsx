@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useActionState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -15,52 +15,81 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Transporter, Shipment, Customer, Invoice } from "@prisma/client";
-import { createDispatchAction, type ActionResult } from "@/lib/actions/dispatches";
+import type { Transporter, Booking, Customer, Invoice } from "@prisma/client";
+import { api, ApiError } from "@/lib/api/client";
 
-type ShipmentOption = Shipment & { customer: Customer; invoice: Invoice | null };
+type BookingOption = Booking & { customer: Customer; invoice: Invoice | null };
 
 export function DispatchForm({
-  shipments,
+  bookings,
   transporters,
-  defaultShipmentId,
+  defaultBookingId,
 }: {
-  shipments: ShipmentOption[];
+  bookings: BookingOption[];
   transporters: Transporter[];
-  defaultShipmentId?: string;
+  defaultBookingId?: string;
 }) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState<ActionResult, FormData>(
-    createDispatchAction,
-    {}
-  );
-  const [shipmentId, setShipmentId] = React.useState(defaultShipmentId ?? "");
+  const queryClient = useQueryClient();
+  const [error, setError] = React.useState<string | null>(null);
+  const [bookingId, setBookingId] = React.useState(defaultBookingId ?? "");
   const [transporterId, setTransporterId] = React.useState("");
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
+  const mutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      api.post<{ id: string }>("/api/dispatches", payload),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["dispatches"] });
+      router.push(`/dispatches/${data.id}`);
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : "Something went wrong");
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const formData = new FormData(e.currentTarget);
+    mutation.mutate({
+      bookingId,
+      truckNumber: formData.get("truckNumber"),
+      driverName: formData.get("driverName"),
+      driverMobile: formData.get("driverMobile"),
+      transporterId,
+      material: formData.get("material"),
+      referenceNumber: formData.get("referenceNumber") || undefined,
+      lrNumber: formData.get("lrNumber") || undefined,
+      numberOfWeights: formData.get("numberOfWeights") || undefined,
+      numberOfBlocks: formData.get("numberOfBlocks") || undefined,
+      dispatchDate: formData.get("dispatchDate"),
+      expectedFactoryArrival: formData.get("expectedFactoryArrival"),
+    });
+  }
+
   return (
-    <form action={formAction} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardContent className="grid gap-4 sm:grid-cols-2 py-1">
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="shipmentId">Shipment / Invoice</Label>
-            <input type="hidden" name="shipmentId" value={shipmentId} />
-            <Select value={shipmentId} onValueChange={(v) => v && setShipmentId(v)}>
-              <SelectTrigger id="shipmentId" className="w-full">
-                <SelectValue placeholder="Select a shipment">
+            <Label htmlFor="bookingId">Booking / Invoice</Label>
+            <Select value={bookingId} onValueChange={(v) => v && setBookingId(v)}>
+              <SelectTrigger id="bookingId" className="w-full">
+                <SelectValue placeholder="Select a booking">
                   {(value: string | null) => {
-                    const s = shipments.find((s) => s.id === value);
+                    const s = bookings.find((s) => s.id === value);
                     return s
-                      ? `${s.shipmentNumber} · ${s.customer.name}${s.invoice ? ` · ${s.invoice.invoiceNumber}` : ""}`
+                      ? `${s.bookingNumber} · ${s.customer.name}${s.invoice ? ` · ${s.invoice.invoiceNumber}` : ""}`
                       : null;
                   }}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {shipments.map((s) => (
+                {bookings.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.shipmentNumber} · {s.customer.name}
+                    {s.bookingNumber} · {s.customer.name}
                     {s.invoice ? ` · ${s.invoice.invoiceNumber}` : ""}
                   </SelectItem>
                 ))}
@@ -76,6 +105,10 @@ export function DispatchForm({
             <Input id="referenceNumber" name="referenceNumber" />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="lrNumber">LR Number</Label>
+            <Input id="lrNumber" name="lrNumber" />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="driverName">Driver Name</Label>
             <Input id="driverName" name="driverName" required />
           </div>
@@ -85,7 +118,6 @@ export function DispatchForm({
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="transporterId">Transporter</Label>
-            <input type="hidden" name="transporterId" value={transporterId} />
             <Select value={transporterId} onValueChange={(v) => v && setTransporterId(v)}>
               <SelectTrigger id="transporterId" className="w-full">
                 <SelectValue placeholder="Select a transporter">
@@ -133,11 +165,11 @@ export function DispatchForm({
         </CardContent>
       </Card>
 
-      {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex items-center gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Create Dispatch"}
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? "Saving…" : "Create Dispatch"}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel

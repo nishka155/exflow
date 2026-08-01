@@ -45,7 +45,7 @@ function InvoicesPageContent() {
     <div>
       <PageHeader
         title="Export Invoices"
-        description="Create and manage export invoices for your shipments."
+        description="Create and manage export invoices for your bookings."
         actions={
           <Button nativeButton={false} render={<Link href="/invoices/new" />}>
             <Plus />
@@ -66,7 +66,7 @@ function InvoicesPageContent() {
         <EmptyState
           icon={FileText}
           title="No invoices yet"
-          description="Create your first export invoice to start a shipment."
+          description="Create your first export invoice to start a booking."
           action={
             <Button nativeButton={false} render={<Link href="/invoices/new" />}>
               <Plus />

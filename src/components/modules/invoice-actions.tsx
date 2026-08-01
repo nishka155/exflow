@@ -127,7 +127,7 @@ export function InvoiceActions({
             <AlertDialogHeader>
               <AlertDialogTitle>Delete this invoice?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete the invoice and its associated shipment record.
+                This will permanently delete the invoice and its associated booking record.
                 This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>

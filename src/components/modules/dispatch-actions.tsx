@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Truck, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { setDispatchStatusAction } from "@/lib/actions/dispatches";
+import { api, ApiError } from "@/lib/api/client";
 import type { DispatchStatus } from "@/lib/constants/statuses";
 
 export function DispatchActions({
@@ -16,17 +16,18 @@ export function DispatchActions({
   dispatchId: string;
   status: DispatchStatus;
 }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [pending, startTransition] = React.useTransition();
 
   function run(next: DispatchStatus, message: string) {
     startTransition(async () => {
       try {
-        await setDispatchStatusAction(dispatchId, next);
+        await api.post(`/api/dispatches/${dispatchId}/status`, { status: next });
+        queryClient.invalidateQueries({ queryKey: ["dispatch", dispatchId] });
+        queryClient.invalidateQueries({ queryKey: ["dispatches"] });
         toast.success(message);
-        router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Something went wrong");
+        toast.error(err instanceof ApiError ? err.message : "Something went wrong");
       }
     });
   }

@@ -27,6 +27,15 @@ function daysAgo(n: number) {
   return d;
 }
 
+async function upsertFactoryStuffing(
+  containerNumber: string,
+  data: Parameters<typeof prisma.factoryStuffing.create>[0]["data"]
+) {
+  const existing = await prisma.factoryStuffing.findFirst({ where: { containerNumber } });
+  if (existing) return existing;
+  return prisma.factoryStuffing.create({ data });
+}
+
 async function main() {
   const organization = await prisma.organization.findFirst({
     orderBy: { createdAt: "asc" },
@@ -121,13 +130,13 @@ async function main() {
     },
   });
 
-  async function upsertShipment(shipmentNumber: string, customerId: string, currentStage: Parameters<typeof prisma.shipment.create>[0]["data"]["currentStage"], isDelayed = false) {
-    return prisma.shipment.upsert({
-      where: { shipmentNumber },
+  async function upsertBooking(bookingNumber: string, customerId: string, currentStage: Parameters<typeof prisma.booking.create>[0]["data"]["currentStage"], isDelayed = false) {
+    return prisma.booking.upsert({
+      where: { bookingNumber },
       update: {},
       create: {
         organizationId: orgId,
-        shipmentNumber,
+        bookingNumber,
         customerId,
         currentStage,
         isDelayed,
@@ -136,14 +145,14 @@ async function main() {
     });
   }
 
-  // Shipment 1 — invoice only (draft)
-  const s1 = await upsertShipment("EXF-2026-000001", nordic.id, "INVOICE");
+  // Booking 1 — invoice only (draft)
+  const s1 = await upsertBooking("EXF-2026-000001", nordic.id, "INVOICE");
   await prisma.invoice.upsert({
-    where: { shipmentId: s1.id },
+    where: { bookingId: s1.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s1.id,
+      bookingId: s1.id,
       invoiceNumber: "INV-2026-0001",
       invoiceDate: daysAgo(1),
       customerId: nordic.id,
@@ -163,10 +172,10 @@ async function main() {
       createdById: docExec.id,
     },
   });
-  await prisma.shipmentTimelineEvent.createMany({
+  await prisma.bookingTimelineEvent.createMany({
     data: [
       {
-        shipmentId: s1.id,
+        bookingId: s1.id,
         stage: "INVOICE",
         title: "Invoice created",
         description: "Draft invoice INV-2026-0001 created for Nordic Textiles AB.",
@@ -176,14 +185,14 @@ async function main() {
     ],
   });
 
-  // Shipment 2 — invoice approved, truck dispatched and delayed
-  const s2 = await upsertShipment("EXF-2026-000002", gulf.id, "DISPATCH", true);
+  // Booking 2 — invoice approved, truck dispatched and delayed
+  const s2 = await upsertBooking("EXF-2026-000002", gulf.id, "DISPATCH", true);
   await prisma.invoice.upsert({
-    where: { shipmentId: s2.id },
+    where: { bookingId: s2.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s2.id,
+      bookingId: s2.id,
       invoiceNumber: "INV-2026-0002",
       invoiceDate: daysAgo(4),
       customerId: gulf.id,
@@ -203,12 +212,12 @@ async function main() {
       createdById: docExec.id,
     },
   });
-  const d2 = await prisma.truckDispatch.findFirst({ where: { shipmentId: s2.id } });
+  const d2 = await prisma.truckDispatch.findFirst({ where: { bookingId: s2.id } });
   if (!d2) {
     await prisma.truckDispatch.create({
       data: {
         organizationId: orgId,
-        shipmentId: s2.id,
+        bookingId: s2.id,
         truckNumber: "GJ-01-AB-1234",
         driverName: "Ramesh Yadav",
         driverMobile: "+91 98200 12345",
@@ -223,22 +232,22 @@ async function main() {
       },
     });
   }
-  await prisma.shipmentTimelineEvent.createMany({
+  await prisma.bookingTimelineEvent.createMany({
     data: [
-      { shipmentId: s2.id, stage: "INVOICE", title: "Invoice approved", occurredAt: daysAgo(3), actorId: exportManager.id },
-      { shipmentId: s2.id, stage: "DISPATCH", title: "Truck dispatched", description: "GJ-01-AB-1234 dispatched via Sharma Road Carriers.", occurredAt: daysAgo(2), actorId: transportCoordinator.id },
-      { shipmentId: s2.id, stage: "DISPATCH", title: "Truck delayed", description: "Expected factory arrival missed — flagged as delayed.", occurredAt: daysAgo(0), actorId: transportCoordinator.id },
+      { bookingId: s2.id, stage: "INVOICE", title: "Invoice approved", occurredAt: daysAgo(3), actorId: exportManager.id },
+      { bookingId: s2.id, stage: "DISPATCH", title: "Truck dispatched", description: "GJ-01-AB-1234 dispatched via Sharma Road Carriers.", occurredAt: daysAgo(2), actorId: transportCoordinator.id },
+      { bookingId: s2.id, stage: "DISPATCH", title: "Truck delayed", description: "Expected factory arrival missed — flagged as delayed.", occurredAt: daysAgo(0), actorId: transportCoordinator.id },
     ],
   });
 
-  // Shipment 3 — factory stuffing in progress
-  const s3 = await upsertShipment("EXF-2026-000003", pacific.id, "STUFFING");
+  // Booking 3 — factory stuffing in progress
+  const s3 = await upsertBooking("EXF-2026-000003", pacific.id, "STUFFING");
   await prisma.invoice.upsert({
-    where: { shipmentId: s3.id },
+    where: { bookingId: s3.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s3.id,
+      bookingId: s3.id,
       invoiceNumber: "INV-2026-0003",
       invoiceDate: daysAgo(6),
       customerId: pacific.id,
@@ -258,11 +267,11 @@ async function main() {
       createdById: docExec.id,
     },
   });
-  if (!(await prisma.truckDispatch.findFirst({ where: { shipmentId: s3.id } }))) {
+  if (!(await prisma.truckDispatch.findFirst({ where: { bookingId: s3.id } }))) {
     await prisma.truckDispatch.create({
       data: {
         organizationId: orgId,
-        shipmentId: s3.id,
+        bookingId: s3.id,
         truckNumber: "RJ-14-CD-5678",
         driverName: "Om Prakash",
         driverMobile: "+91 99887 66554",
@@ -277,44 +286,40 @@ async function main() {
       },
     });
   }
-  await prisma.factoryStuffing.upsert({
-    where: { shipmentId: s3.id },
-    update: {},
-    create: {
-      organizationId: orgId,
-      shipmentId: s3.id,
-      containerNumber: "TCLU1234567",
-      containerSize: "FT40_HC",
-      sealNumber: "SL-889912",
-      transporterId: speedway.id,
-      pol: "Mundra, India",
-      pod: "Ho Chi Minh City, Vietnam",
-      numberOfBoxes: 15,
-      grossWeight: 30500,
-      netWeight: 30000,
-      stuffingStartTime: daysAgo(2),
-      checklistContainerClean: true,
-      checklistSealApplied: false,
-      checklistDocumentsUploaded: false,
-      status: "IN_PROGRESS",
-      createdById: factoryUser.id,
-    },
+  await upsertFactoryStuffing("TCLU1234567", {
+    organizationId: orgId,
+    bookingId: s3.id,
+    containerNumber: "TCLU1234567",
+    containerSize: "FT40_HC",
+    sealNumber: "SL-889912",
+    transporterId: speedway.id,
+    pol: "Mundra, India",
+    pod: "Ho Chi Minh City, Vietnam",
+    numberOfBoxes: 15,
+    grossWeight: 30500,
+    netWeight: 30000,
+    stuffingStartTime: daysAgo(2),
+    checklistContainerClean: true,
+    checklistSealApplied: false,
+    checklistDocumentsUploaded: false,
+    status: "IN_PROGRESS",
+    createdById: factoryUser.id,
   });
-  await prisma.shipmentTimelineEvent.createMany({
+  await prisma.bookingTimelineEvent.createMany({
     data: [
-      { shipmentId: s3.id, stage: "DISPATCH", title: "Truck reached factory", occurredAt: daysAgo(3), actorId: transportCoordinator.id },
-      { shipmentId: s3.id, stage: "STUFFING", title: "Factory stuffing started", description: "Container TCLU1234567 stuffing in progress.", occurredAt: daysAgo(2), actorId: factoryUser.id },
+      { bookingId: s3.id, stage: "DISPATCH", title: "Truck reached factory", occurredAt: daysAgo(3), actorId: transportCoordinator.id },
+      { bookingId: s3.id, stage: "STUFFING", title: "Factory stuffing started", description: "Container TCLU1234567 stuffing in progress.", occurredAt: daysAgo(2), actorId: factoryUser.id },
     ],
   });
 
-  // Shipment 4 — through gate-in
-  const s4 = await upsertShipment("EXF-2026-000004", nordic.id, "GATE_IN");
+  // Booking 4 — through gate-in
+  const s4 = await upsertBooking("EXF-2026-000004", nordic.id, "GATE_IN");
   await prisma.invoice.upsert({
-    where: { shipmentId: s4.id },
+    where: { bookingId: s4.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s4.id,
+      bookingId: s4.id,
       invoiceNumber: "INV-2026-0004",
       invoiceDate: daysAgo(10),
       customerId: nordic.id,
@@ -334,11 +339,11 @@ async function main() {
       createdById: docExec.id,
     },
   });
-  if (!(await prisma.truckDispatch.findFirst({ where: { shipmentId: s4.id } }))) {
+  if (!(await prisma.truckDispatch.findFirst({ where: { bookingId: s4.id } }))) {
     await prisma.truckDispatch.create({
       data: {
         organizationId: orgId,
-        shipmentId: s4.id,
+        bookingId: s4.id,
         truckNumber: "GJ-05-EF-9012",
         driverName: "Santosh More",
         driverMobile: "+91 90000 11223",
@@ -353,36 +358,32 @@ async function main() {
       },
     });
   }
-  const stuffing4 = await prisma.factoryStuffing.upsert({
-    where: { shipmentId: s4.id },
-    update: {},
-    create: {
-      organizationId: orgId,
-      shipmentId: s4.id,
-      containerNumber: "MSCU7654321",
-      containerSize: "FT40",
-      sealNumber: "SL-778823",
-      transporterId: sharma.id,
-      pol: "Mundra, India",
-      pod: "Gothenburg, Sweden",
-      numberOfBoxes: 13,
-      grossWeight: 26400,
-      netWeight: 26000,
-      stuffingStartTime: daysAgo(6),
-      stuffingEndTime: daysAgo(6),
-      checklistContainerClean: true,
-      checklistSealApplied: true,
-      checklistDocumentsUploaded: true,
-      status: "COMPLETED",
-      createdById: factoryUser.id,
-    },
+  const stuffing4 = await upsertFactoryStuffing("MSCU7654321", {
+    organizationId: orgId,
+    bookingId: s4.id,
+    containerNumber: "MSCU7654321",
+    containerSize: "FT40",
+    sealNumber: "SL-778823",
+    transporterId: sharma.id,
+    pol: "Mundra, India",
+    pod: "Gothenburg, Sweden",
+    numberOfBoxes: 13,
+    grossWeight: 26400,
+    netWeight: 26000,
+    stuffingStartTime: daysAgo(6),
+    stuffingEndTime: daysAgo(6),
+    checklistContainerClean: true,
+    checklistSealApplied: true,
+    checklistDocumentsUploaded: true,
+    status: "COMPLETED",
+    createdById: factoryUser.id,
   });
   await prisma.gateIn.upsert({
-    where: { shipmentId: s4.id },
+    where: { factoryStuffingId: stuffing4.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s4.id,
+      bookingId: s4.id,
       factoryStuffingId: stuffing4.id,
       containerNumber: "MSCU7654321",
       gateInDate: daysAgo(5),
@@ -396,21 +397,21 @@ async function main() {
       createdById: docExec.id,
     },
   });
-  await prisma.shipmentTimelineEvent.createMany({
+  await prisma.bookingTimelineEvent.createMany({
     data: [
-      { shipmentId: s4.id, stage: "STUFFING", title: "Factory stuffing completed", occurredAt: daysAgo(6), actorId: factoryUser.id },
-      { shipmentId: s4.id, stage: "GATE_IN", title: "Container gated in", description: "Gated in at Mundra International Container Terminal.", occurredAt: daysAgo(5), actorId: docExec.id },
+      { bookingId: s4.id, stage: "STUFFING", title: "Factory stuffing completed", occurredAt: daysAgo(6), actorId: factoryUser.id },
+      { bookingId: s4.id, stage: "GATE_IN", title: "Container gated in", description: "Gated in at Mundra International Container Terminal.", occurredAt: daysAgo(5), actorId: docExec.id },
     ],
   });
 
-  // Shipment 5 — shipping instruction sent, pending BL
-  const s5 = await upsertShipment("EXF-2026-000005", gulf.id, "SHIPPING_INSTRUCTION");
+  // Booking 5 — shipping instruction sent, pending BL
+  const s5 = await upsertBooking("EXF-2026-000005", gulf.id, "SHIPPING_INSTRUCTION");
   await prisma.invoice.upsert({
-    where: { shipmentId: s5.id },
+    where: { bookingId: s5.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s5.id,
+      bookingId: s5.id,
       invoiceNumber: "INV-2026-0005",
       invoiceDate: daysAgo(14),
       customerId: gulf.id,
@@ -430,11 +431,11 @@ async function main() {
       createdById: docExec.id,
     },
   });
-  if (!(await prisma.truckDispatch.findFirst({ where: { shipmentId: s5.id } }))) {
+  if (!(await prisma.truckDispatch.findFirst({ where: { bookingId: s5.id } }))) {
     await prisma.truckDispatch.create({
       data: {
         organizationId: orgId,
-        shipmentId: s5.id,
+        bookingId: s5.id,
         truckNumber: "RJ-27-GH-3344",
         driverName: "Deepak Rathore",
         driverMobile: "+91 97000 22334",
@@ -449,36 +450,32 @@ async function main() {
       },
     });
   }
-  const stuffing5 = await prisma.factoryStuffing.upsert({
-    where: { shipmentId: s5.id },
-    update: {},
-    create: {
-      organizationId: orgId,
-      shipmentId: s5.id,
-      containerNumber: "HLXU4455667",
-      containerSize: "FT20",
-      sealNumber: "SL-661029",
-      transporterId: speedway.id,
-      pol: "Kandla, India",
-      pod: "Jebel Ali, UAE",
-      numberOfBoxes: 10,
-      grossWeight: 35400,
-      netWeight: 35000,
-      stuffingStartTime: daysAgo(10),
-      stuffingEndTime: daysAgo(10),
-      checklistContainerClean: true,
-      checklistSealApplied: true,
-      checklistDocumentsUploaded: true,
-      status: "COMPLETED",
-      createdById: factoryUser.id,
-    },
+  const stuffing5 = await upsertFactoryStuffing("HLXU4455667", {
+    organizationId: orgId,
+    bookingId: s5.id,
+    containerNumber: "HLXU4455667",
+    containerSize: "FT20",
+    sealNumber: "SL-661029",
+    transporterId: speedway.id,
+    pol: "Kandla, India",
+    pod: "Jebel Ali, UAE",
+    numberOfBoxes: 10,
+    grossWeight: 35400,
+    netWeight: 35000,
+    stuffingStartTime: daysAgo(10),
+    stuffingEndTime: daysAgo(10),
+    checklistContainerClean: true,
+    checklistSealApplied: true,
+    checklistDocumentsUploaded: true,
+    status: "COMPLETED",
+    createdById: factoryUser.id,
   });
   await prisma.gateIn.upsert({
-    where: { shipmentId: s5.id },
+    where: { factoryStuffingId: stuffing5.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s5.id,
+      bookingId: s5.id,
       factoryStuffingId: stuffing5.id,
       containerNumber: "HLXU4455667",
       gateInDate: daysAgo(9),
@@ -492,11 +489,11 @@ async function main() {
     },
   });
   await prisma.shippingInstruction.upsert({
-    where: { shipmentId: s5.id },
+    where: { bookingId: s5.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s5.id,
+      bookingId: s5.id,
       consignorName: organization.name,
       consigneeName: gulf.name,
       consigneeAddress: `${gulf.address}, ${gulf.city}, ${gulf.country}`,
@@ -519,21 +516,21 @@ async function main() {
       createdById: docExec.id,
     },
   });
-  await prisma.shipmentTimelineEvent.createMany({
+  await prisma.bookingTimelineEvent.createMany({
     data: [
-      { shipmentId: s5.id, stage: "GATE_IN", title: "Container gated in", occurredAt: daysAgo(9), actorId: docExec.id },
-      { shipmentId: s5.id, stage: "SHIPPING_INSTRUCTION", title: "Shipping instruction sent to line", description: "SI emailed to Hapag-Lloyd for voyage HL2214W.", occurredAt: daysAgo(2), actorId: docExec.id },
+      { bookingId: s5.id, stage: "GATE_IN", title: "Container gated in", occurredAt: daysAgo(9), actorId: docExec.id },
+      { bookingId: s5.id, stage: "SHIPPING_INSTRUCTION", title: "Shipping instruction sent to line", description: "SI emailed to Hapag-Lloyd for voyage HL2214W.", occurredAt: daysAgo(2), actorId: docExec.id },
     ],
   });
 
-  // Shipment 6 — fully completed with final BL
-  const s6 = await upsertShipment("EXF-2026-000006", pacific.id, "COMPLETED");
+  // Booking 6 — fully completed with final BL
+  const s6 = await upsertBooking("EXF-2026-000006", pacific.id, "COMPLETED");
   await prisma.invoice.upsert({
-    where: { shipmentId: s6.id },
+    where: { bookingId: s6.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s6.id,
+      bookingId: s6.id,
       invoiceNumber: "INV-2026-0006",
       invoiceDate: daysAgo(21),
       customerId: pacific.id,
@@ -553,11 +550,11 @@ async function main() {
       createdById: docExec.id,
     },
   });
-  if (!(await prisma.truckDispatch.findFirst({ where: { shipmentId: s6.id } }))) {
+  if (!(await prisma.truckDispatch.findFirst({ where: { bookingId: s6.id } }))) {
     await prisma.truckDispatch.create({
       data: {
         organizationId: orgId,
-        shipmentId: s6.id,
+        bookingId: s6.id,
         truckNumber: "RJ-09-JK-7788",
         driverName: "Vinod Bhatt",
         driverMobile: "+91 96500 33445",
@@ -572,36 +569,32 @@ async function main() {
       },
     });
   }
-  const stuffing6 = await prisma.factoryStuffing.upsert({
-    where: { shipmentId: s6.id },
-    update: {},
-    create: {
-      organizationId: orgId,
-      shipmentId: s6.id,
-      containerNumber: "OOLU8899001",
-      containerSize: "FT40",
-      sealNumber: "SL-552210",
-      transporterId: sharma.id,
-      pol: "Mundra, India",
-      pod: "Ho Chi Minh City, Vietnam",
-      numberOfBoxes: 16,
-      grossWeight: 32500,
-      netWeight: 32000,
-      stuffingStartTime: daysAgo(17),
-      stuffingEndTime: daysAgo(17),
-      checklistContainerClean: true,
-      checklistSealApplied: true,
-      checklistDocumentsUploaded: true,
-      status: "COMPLETED",
-      createdById: factoryUser.id,
-    },
+  const stuffing6 = await upsertFactoryStuffing("OOLU8899001", {
+    organizationId: orgId,
+    bookingId: s6.id,
+    containerNumber: "OOLU8899001",
+    containerSize: "FT40",
+    sealNumber: "SL-552210",
+    transporterId: sharma.id,
+    pol: "Mundra, India",
+    pod: "Ho Chi Minh City, Vietnam",
+    numberOfBoxes: 16,
+    grossWeight: 32500,
+    netWeight: 32000,
+    stuffingStartTime: daysAgo(17),
+    stuffingEndTime: daysAgo(17),
+    checklistContainerClean: true,
+    checklistSealApplied: true,
+    checklistDocumentsUploaded: true,
+    status: "COMPLETED",
+    createdById: factoryUser.id,
   });
   await prisma.gateIn.upsert({
-    where: { shipmentId: s6.id },
+    where: { factoryStuffingId: stuffing6.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s6.id,
+      bookingId: s6.id,
       factoryStuffingId: stuffing6.id,
       containerNumber: "OOLU8899001",
       gateInDate: daysAgo(16),
@@ -615,11 +608,11 @@ async function main() {
     },
   });
   const si6 = await prisma.shippingInstruction.upsert({
-    where: { shipmentId: s6.id },
+    where: { bookingId: s6.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s6.id,
+      bookingId: s6.id,
       consignorName: organization.name,
       consigneeName: pacific.name,
       consigneeAddress: `${pacific.address}, ${pacific.city}, ${pacific.country}`,
@@ -643,11 +636,11 @@ async function main() {
     },
   });
   await prisma.billOfLading.upsert({
-    where: { shipmentId: s6.id },
+    where: { bookingId: s6.id },
     update: {},
     create: {
       organizationId: orgId,
-      shipmentId: s6.id,
+      bookingId: s6.id,
       shippingInstructionId: si6.id,
       blNumber: "BL-ONE-0091-002",
       blDate: daysAgo(13),
@@ -669,10 +662,10 @@ async function main() {
       createdById: docExec.id,
     },
   });
-  await prisma.shipmentTimelineEvent.createMany({
+  await prisma.bookingTimelineEvent.createMany({
     data: [
-      { shipmentId: s6.id, stage: "SHIPPING_INSTRUCTION", title: "SI confirmed by shipping line", occurredAt: daysAgo(14), actorId: docExec.id },
-      { shipmentId: s6.id, stage: "BILL_OF_LADING", title: "Final Bill of Lading issued", description: "BL-ONE-0091-002 issued and shipment marked completed.", occurredAt: daysAgo(13), actorId: docExec.id },
+      { bookingId: s6.id, stage: "SHIPPING_INSTRUCTION", title: "SI confirmed by shipping line", occurredAt: daysAgo(14), actorId: docExec.id },
+      { bookingId: s6.id, stage: "BILL_OF_LADING", title: "Final Bill of Lading issued", description: "BL-ONE-0091-002 issued and booking marked completed.", occurredAt: daysAgo(13), actorId: docExec.id },
     ],
   });
 
@@ -680,7 +673,7 @@ async function main() {
     organization: organization.name,
     customers: [nordic.name, gulf.name, pacific.name],
     transporters: [sharma.name, speedway.name],
-    shipments: ["EXF-2026-000001", "EXF-2026-000002", "EXF-2026-000003", "EXF-2026-000004", "EXF-2026-000005", "EXF-2026-000006"],
+    bookings: ["EXF-2026-000001", "EXF-2026-000002", "EXF-2026-000003", "EXF-2026-000004", "EXF-2026-000005", "EXF-2026-000006"],
   });
 }
 

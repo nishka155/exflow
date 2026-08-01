@@ -1,25 +1,83 @@
 "use client";
 
 import * as React from "react";
-import { useActionState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { updateBillOfLadingAction, type ActionResult } from "@/lib/actions/bills-of-lading";
-import type { SerializedBL } from "@/lib/serializers/bill-of-lading";
+import { api, ApiError } from "@/lib/api/client";
 
-export function BillOfLadingForm({ bl }: { bl: SerializedBL }) {
+export interface BLFormValues {
+  id: string;
+  blNumber: string | null;
+  blDate: string | null;
+  consignorName: string;
+  consignorAddress: string | null;
+  consigneeName: string;
+  consigneeAddress: string | null;
+  notifyPartyName: string | null;
+  notifyPartyAddress: string | null;
+  pol: string;
+  pod: string;
+  vessel: string | null;
+  voyage: string | null;
+  containerNumber: string | null;
+  sealNumber: string | null;
+  commodity: string;
+  packageCount: number | null;
+  weight: string | null;
+  freightTerms: string | null;
+}
+
+export function BillOfLadingForm({ bl }: { bl: BLFormValues }) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState<ActionResult, FormData>(
-    updateBillOfLadingAction.bind(null, bl.id),
-    {}
-  );
+  const queryClient = useQueryClient();
+  const [error, setError] = React.useState<string | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      api.put<{ id: string }>(`/api/bills-of-lading/${bl.id}`, payload),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["bill-of-lading", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["bills-of-lading"] });
+      router.push(`/bills-of-lading/${data.id}`);
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : "Something went wrong");
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const formData = new FormData(e.currentTarget);
+    mutation.mutate({
+      blNumber: formData.get("blNumber") || undefined,
+      blDate: formData.get("blDate") || undefined,
+      consignorName: formData.get("consignorName"),
+      consignorAddress: formData.get("consignorAddress") || undefined,
+      consigneeName: formData.get("consigneeName"),
+      consigneeAddress: formData.get("consigneeAddress") || undefined,
+      notifyPartyName: formData.get("notifyPartyName") || undefined,
+      notifyPartyAddress: formData.get("notifyPartyAddress") || undefined,
+      pol: formData.get("pol"),
+      pod: formData.get("pod"),
+      vessel: formData.get("vessel") || undefined,
+      voyage: formData.get("voyage") || undefined,
+      containerNumber: formData.get("containerNumber") || undefined,
+      sealNumber: formData.get("sealNumber") || undefined,
+      commodity: formData.get("commodity"),
+      packageCount: formData.get("packageCount") || undefined,
+      weight: formData.get("weight") || undefined,
+      freightTerms: formData.get("freightTerms") || undefined,
+    });
+  }
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardContent className="grid gap-4 sm:grid-cols-2 py-1">
           <div className="space-y-2">
@@ -111,11 +169,11 @@ export function BillOfLadingForm({ bl }: { bl: SerializedBL }) {
         </CardContent>
       </Card>
 
-      {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex items-center gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save Changes"}
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? "Saving…" : "Save Changes"}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel
