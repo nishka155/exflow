@@ -75,6 +75,7 @@ router.post("/", async (req, res, next) => {
         bookingId: data.bookingId,
         containerNumber: data.containerNumber || "TBD",
         containerSize: data.containerSize ?? "FT40",
+        commodity: data.commodity || booking.commodity,
         sealNumber: data.sealNumber,
         contactPerson: data.contactPerson,
         contactNumber: data.contactNumber,
@@ -134,6 +135,7 @@ router.put("/:id", async (req, res, next) => {
       data: {
         ...(data.containerNumber !== undefined && { containerNumber: data.containerNumber }),
         ...(data.containerSize !== undefined && { containerSize: data.containerSize }),
+        ...(data.commodity !== undefined && { commodity: data.commodity }),
         ...(data.sealNumber !== undefined && { sealNumber: data.sealNumber }),
         ...(data.contactPerson !== undefined && { contactPerson: data.contactPerson }),
         ...(data.contactNumber !== undefined && { contactNumber: data.contactNumber }),

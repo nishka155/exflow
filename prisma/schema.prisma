@@ -457,6 +457,7 @@ model FactoryStuffing {
 
   containerNumber   String
   containerSize     ContainerSize
+  commodity         String?
   sealNumber        String?
   contactPerson     String?
   contactNumber     String?

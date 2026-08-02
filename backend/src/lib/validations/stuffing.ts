@@ -6,6 +6,7 @@ export const stuffingSchema = z.object({
   bookingId: z.string().min(1, "Booking is required"),
   containerNumber: z.string().optional(),
   containerSize: z.enum(["FT20", "FT40", "FT40_HC"]).optional(),
+  commodity: z.string().optional(),
   sealNumber: z.string().optional(),
   contactPerson: z.string().optional(),
   contactNumber: z.string().optional(),
@@ -27,6 +28,7 @@ export type StuffingInput = z.infer<typeof stuffingSchema>;
 export const stuffingUpdateSchema = z.object({
   containerNumber: z.string().min(1, "Container number is required").optional(),
   containerSize: z.enum(["FT20", "FT40", "FT40_HC"]).optional(),
+  commodity: z.string().nullable().optional(),
   sealNumber: z.string().nullable().optional(),
   contactPerson: z.string().nullable().optional(),
   contactNumber: z.string().nullable().optional(),
