@@ -10,7 +10,6 @@ import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { DocumentList } from "@/components/shared/document-list";
 import { DocumentUploader } from "@/components/shared/document-uploader";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api/client";
 import { GATE_IN_STATUS_CONFIG, type GateInStatus } from "@/lib/constants/statuses";
@@ -144,8 +143,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function GateInDetailPage() {
   return (
-    <AuthGuard>
-      <GateInDetailPageContent />
-    </AuthGuard>
+    <GateInDetailPageContent />
   );
 }

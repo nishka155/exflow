@@ -5,7 +5,6 @@ import { Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { InvoiceForm } from "@/components/modules/invoice-form";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 
 interface Customer {
@@ -37,9 +36,5 @@ function NewInvoicePageContent() {
 }
 
 export default function NewInvoicePage() {
-  return (
-    <AuthGuard>
-      <NewInvoicePageContent />
-    </AuthGuard>
-  );
+  return <NewInvoicePageContent />;
 }

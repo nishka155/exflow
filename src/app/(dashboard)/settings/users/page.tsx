@@ -6,7 +6,6 @@ import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { InviteUserForm } from "@/components/modules/invite-user-form";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import { ROLE_LABELS, type Role } from "@/lib/constants/roles";
 
@@ -64,8 +63,6 @@ function UsersPageContent() {
 
 export default function UsersPage() {
   return (
-    <AuthGuard>
-      <UsersPageContent />
-    </AuthGuard>
+    <UsersPageContent />
   );
 }

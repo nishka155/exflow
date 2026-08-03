@@ -15,7 +15,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import { SOB_STATUS_CONFIG, type SobStatus } from "@/lib/constants/statuses";
 
@@ -88,8 +87,6 @@ function SobPageContent() {
 
 export default function SobPage() {
   return (
-    <AuthGuard>
-      <SobPageContent />
-    </AuthGuard>
+    <SobPageContent />
   );
 }

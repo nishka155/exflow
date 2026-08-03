@@ -17,7 +17,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import { GATE_IN_STATUS_CONFIG, type GateInStatus } from "@/lib/constants/statuses";
 
@@ -105,8 +104,6 @@ function GateInPageContent() {
 
 export default function GateInPage() {
   return (
-    <AuthGuard>
-      <GateInPageContent />
-    </AuthGuard>
+    <GateInPageContent />
   );
 }

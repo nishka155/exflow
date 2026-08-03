@@ -12,7 +12,6 @@ import { DocumentList } from "@/components/shared/document-list";
 import { DocumentUploader } from "@/components/shared/document-uploader";
 import { FinalizeBLButton } from "@/components/modules/bill-of-lading-actions";
 import { GenerateReportButton } from "@/components/modules/generate-report-button";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api/client";
@@ -252,8 +251,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function BillOfLadingDetailPage() {
   return (
-    <AuthGuard>
-      <BillOfLadingDetailPageContent />
-    </AuthGuard>
+    <BillOfLadingDetailPageContent />
   );
 }

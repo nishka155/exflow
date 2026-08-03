@@ -18,7 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api, ApiError } from "@/lib/api/client";
 import type { DocumentCategory } from "@prisma/client";
 
@@ -144,8 +143,6 @@ function DocumentsPageContent() {
 
 export default function DocumentsPage() {
   return (
-    <AuthGuard>
-      <DocumentsPageContent />
-    </AuthGuard>
+    <DocumentsPageContent />
   );
 }

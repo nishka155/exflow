@@ -141,6 +141,55 @@
   --info-foreground: oklch(0.145 0 0);
 }
 
+/* Accent color presets — override brand/primary hue only, light + dark. */
+[data-accent="green"] {
+  --brand: oklch(0.541 0.204 152);
+  --primary: oklch(0.541 0.204 152);
+  --sidebar-primary: oklch(0.541 0.204 152);
+}
+.dark[data-accent="green"] {
+  --brand: oklch(0.702 0.176 152);
+  --primary: oklch(0.702 0.176 152);
+  --sidebar-primary: oklch(0.702 0.176 152);
+}
+
+[data-accent="violet"] {
+  --brand: oklch(0.541 0.204 300);
+  --primary: oklch(0.541 0.204 300);
+  --sidebar-primary: oklch(0.541 0.204 300);
+}
+.dark[data-accent="violet"] {
+  --brand: oklch(0.702 0.176 300);
+  --primary: oklch(0.702 0.176 300);
+  --sidebar-primary: oklch(0.702 0.176 300);
+}
+
+[data-accent="rose"] {
+  --brand: oklch(0.541 0.204 18);
+  --primary: oklch(0.541 0.204 18);
+  --sidebar-primary: oklch(0.541 0.204 18);
+}
+.dark[data-accent="rose"] {
+  --brand: oklch(0.702 0.176 18);
+  --primary: oklch(0.702 0.176 18);
+  --sidebar-primary: oklch(0.702 0.176 18);
+}
+
+[data-accent="amber"] {
+  --brand: oklch(0.541 0.204 75);
+  --primary: oklch(0.541 0.204 75);
+  --primary-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.541 0.204 75);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+}
+.dark[data-accent="amber"] {
+  --brand: oklch(0.702 0.176 75);
+  --primary: oklch(0.702 0.176 75);
+  --primary-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.702 0.176 75);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

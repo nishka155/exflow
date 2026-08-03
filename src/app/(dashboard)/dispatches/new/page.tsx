@@ -6,7 +6,6 @@ import { Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { DispatchForm } from "@/components/modules/dispatch-form";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import type { Transporter, Booking, Customer, Invoice } from "@prisma/client";
 
@@ -41,8 +40,6 @@ function NewDispatchPageContent() {
 
 export default function NewDispatchPage() {
   return (
-    <AuthGuard>
-      <NewDispatchPageContent />
-    </AuthGuard>
+    <NewDispatchPageContent />
   );
 }

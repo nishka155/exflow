@@ -12,7 +12,6 @@ import { DocumentList } from "@/components/shared/document-list";
 import { DocumentUploader } from "@/components/shared/document-uploader";
 import { ShippingInstructionActions } from "@/components/modules/shipping-instruction-actions";
 import { GenerateReportButton } from "@/components/modules/generate-report-button";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api/client";
@@ -193,8 +192,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function ShippingInstructionDetailPage() {
   return (
-    <AuthGuard>
-      <ShippingInstructionDetailPageContent />
-    </AuthGuard>
+    <ShippingInstructionDetailPageContent />
   );
 }

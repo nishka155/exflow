@@ -50,7 +50,6 @@ export interface StuffingRow {
   pol: string;
   pod: string;
   deliveryDate: string | null;
-  lrGrNumber: string | null;
   transporterId: string | null;
   contactNumber: string | null;
   stuffingStartTime: string | null;
@@ -81,7 +80,6 @@ const CSV_HEADERS = [
   "POL",
   "POD",
   "Delivery Date",
-  "LR No.",
   "Contact No.",
   "Stuffing Date",
   "Status",
@@ -106,7 +104,6 @@ const NAV_COLUMNS = [
   "pol",
   "pod",
   "deliveryDate",
-  "lrGrNumber",
   "contactNumber",
   "stuffingStartTime",
 ];
@@ -215,38 +212,57 @@ export function StuffingGrid({
   const [sizeFilter, setSizeFilter] = React.useState("ALL");
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
 
+  const queryKey = React.useMemo(() => ["stuffings", { bookingId }] as const, [bookingId]);
+
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["stuffings"] });
   }
 
+  // Patch the already-loaded row list directly from each mutation's response
+  // instead of invalidating + refetching the whole booking's containers —
+  // editing one cell in a 30-row grid shouldn't cost a full round-trip and
+  // full re-render just to reflect that one change.
+  function patchRow(updated: StuffingRow) {
+    queryClient.setQueryData<StuffingRow[]>(queryKey, (old) =>
+      old?.map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
+    );
+  }
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
-      api.put(`/api/stuffing/${id}`, data),
-    onSuccess: invalidate,
+      api.put<StuffingRow>(`/api/stuffing/${id}`, data),
+    onSuccess: patchRow,
     onError: (err) => {
       toast.error(err instanceof ApiError ? err.message : "Could not save change");
+      invalidate();
     },
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      api.post(`/api/stuffing/${id}/status`, { status }),
-    onSuccess: invalidate,
+      api.post<StuffingRow>(`/api/stuffing/${id}/status`, { status }),
+    onSuccess: patchRow,
     onError: (err) => {
       toast.error(err instanceof ApiError ? err.message : "Invalid status transition");
+      invalidate();
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/stuffing/${id}`),
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<StuffingRow[]>(queryKey, (old) => old?.filter((r) => r.id !== id));
+    },
   });
 
   const duplicateMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
-      api.post<{ id: string }>("/api/stuffing", data),
-    onSuccess: (data) => {
-      invalidate();
-      onAdded?.(data.id);
+      api.post<StuffingRow>("/api/stuffing", data),
+    onSuccess: (created) => {
+      queryClient.setQueryData<StuffingRow[]>(queryKey, (old) =>
+        old ? [created, ...old] : [created]
+      );
+      onAdded?.(created.id);
     },
     onError: (err) => {
       toast.error(err instanceof ApiError ? err.message : "Could not duplicate container");
@@ -275,14 +291,13 @@ export function StuffingGrid({
       numberOfBlocks: row.numberOfBlocks ?? undefined,
       grossWeight: row.grossWeight ?? undefined,
       netWeight: row.netWeight ?? undefined,
-      lrGrNumber: row.lrGrNumber || undefined,
     });
   }
 
   async function handleBulkDelete(ids: string[]) {
     const results = await Promise.allSettled(ids.map((id) => deleteMutation.mutateAsync(id)));
     const failed = results.filter((r) => r.status === "rejected").length;
-    invalidate();
+    if (failed > 0) invalidate();
     setRowSelection({});
     if (failed === 0) {
       toast.success(`Deleted ${ids.length} container${ids.length === 1 ? "" : "s"}`);
@@ -307,7 +322,6 @@ export function StuffingGrid({
       r.pol,
       r.pod,
       toDateInput(r.deliveryDate),
-      r.lrGrNumber ?? "",
       r.contactNumber ?? "",
       toDateInput(r.stuffingStartTime),
       r.status,
@@ -345,7 +359,6 @@ export function StuffingGrid({
           pol: rec["POL"] || undefined,
           pod: rec["POD"] || undefined,
           deliveryDate: rec["Delivery Date"] || undefined,
-          lrGrNumber: rec["LR No."] || undefined,
           contactNumber: rec["Contact No."] || undefined,
         });
         created++;
@@ -543,19 +556,6 @@ export function StuffingGrid({
         ),
       },
       {
-        accessorKey: "lrGrNumber",
-        header: "LR No.",
-        cell: ({ row }) => (
-          <GridInput
-            value={row.original.lrGrNumber ?? ""}
-            rowIndex={row.index}
-            colKey="lrGrNumber"
-            containerRef={containerRef}
-            onSave={(v) => saveField(row.original.id, "lrGrNumber", v)}
-          />
-        ),
-      },
-      {
         accessorKey: "transporterId",
         header: "Transporter",
         cell: ({ row }) => (
@@ -686,7 +686,6 @@ export function StuffingGrid({
         r.sealNumber,
         r.pol,
         r.pod,
-        r.lrGrNumber,
         r.contactNumber,
       ]
         .filter(Boolean)

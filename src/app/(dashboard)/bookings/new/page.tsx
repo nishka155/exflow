@@ -5,7 +5,6 @@ import { Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { BookingForm } from "@/components/modules/booking-form";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import type { Customer } from "@prisma/client";
 
@@ -31,8 +30,6 @@ function NewBookingPageContent() {
 
 export default function NewBookingPage() {
   return (
-    <AuthGuard>
-      <NewBookingPageContent />
-    </AuthGuard>
+    <NewBookingPageContent />
   );
 }

@@ -5,7 +5,6 @@ import { Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { CreateBLForm } from "@/components/modules/create-bl-form";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import type { ShippingInstruction, Booking, Customer } from "@prisma/client";
 
@@ -33,8 +32,6 @@ function NewBillOfLadingPageContent() {
 
 export default function NewBillOfLadingPage() {
   return (
-    <AuthGuard>
-      <NewBillOfLadingPageContent />
-    </AuthGuard>
+    <NewBillOfLadingPageContent />
   );
 }

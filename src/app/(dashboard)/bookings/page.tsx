@@ -17,7 +17,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import { BOOKING_STAGE_CONFIG, type BookingStage } from "@/lib/constants/statuses";
 
@@ -102,8 +101,6 @@ function BookingsPageContent() {
 
 export default function BookingsPage() {
   return (
-    <AuthGuard>
-      <BookingsPageContent />
-    </AuthGuard>
+    <BookingsPageContent />
   );
 }

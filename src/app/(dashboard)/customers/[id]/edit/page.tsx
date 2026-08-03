@@ -7,7 +7,6 @@ import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { CustomerForm } from "@/components/modules/customer-form";
 import { PortalAccessCard } from "@/components/modules/portal-access-card";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 
 interface CustomerDetail {
@@ -55,8 +54,6 @@ function EditCustomerPageContent() {
 
 export default function EditCustomerPage() {
   return (
-    <AuthGuard>
-      <EditCustomerPageContent />
-    </AuthGuard>
+    <EditCustomerPageContent />
   );
 }

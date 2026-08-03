@@ -5,7 +5,6 @@ import { Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { ShippingInstructionForm } from "@/components/modules/shipping-instruction-form";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import type {
   Booking,
@@ -52,8 +51,6 @@ function NewShippingInstructionPageContent() {
 
 export default function NewShippingInstructionPage() {
   return (
-    <AuthGuard>
-      <NewShippingInstructionPageContent />
-    </AuthGuard>
+    <NewShippingInstructionPageContent />
   );
 }

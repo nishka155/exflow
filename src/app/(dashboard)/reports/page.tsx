@@ -19,7 +19,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ExportExcelButton } from "@/components/modules/export-excel-button";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -258,8 +257,6 @@ function ReportsPageContent() {
 
 export default function ReportsPage() {
   return (
-    <AuthGuard>
-      <ReportsPageContent />
-    </AuthGuard>
+    <ReportsPageContent />
   );
 }

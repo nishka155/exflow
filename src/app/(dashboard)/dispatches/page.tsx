@@ -17,14 +17,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import { DISPATCH_STATUS_CONFIG, type DispatchStatus } from "@/lib/constants/statuses";
 
 interface DispatchListItem {
   id: string;
   truckNumber: string;
-  lrNumber: string | null;
   status: string;
   dispatchDate: string;
   booking: { bookingNumber: string; customer: { name: string } };
@@ -76,7 +74,6 @@ function DispatchesPageContent() {
             <TableHeader>
               <TableRow>
                 <TableHead>Truck Number</TableHead>
-                <TableHead>LR Number</TableHead>
                 <TableHead>Booking</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Transporter</TableHead>
@@ -88,7 +85,6 @@ function DispatchesPageContent() {
               {dispatches.map((d) => (
                 <ClickableTableRow key={d.id} href={`/dispatches/${d.id}`}>
                   <TableCell className="font-medium">{d.truckNumber}</TableCell>
-                  <TableCell>{d.lrNumber ?? "—"}</TableCell>
                   <TableCell>{d.booking.bookingNumber}</TableCell>
                   <TableCell>{d.booking.customer.name}</TableCell>
                   <TableCell>{d.transporter.name}</TableCell>
@@ -108,8 +104,6 @@ function DispatchesPageContent() {
 
 export default function DispatchesPage() {
   return (
-    <AuthGuard>
-      <DispatchesPageContent />
-    </AuthGuard>
+    <DispatchesPageContent />
   );
 }

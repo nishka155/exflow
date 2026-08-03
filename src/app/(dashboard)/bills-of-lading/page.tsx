@@ -17,7 +17,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import { BL_STATUS_CONFIG, type BLStatus } from "@/lib/constants/statuses";
 
@@ -105,8 +104,6 @@ function BillsOfLadingPageContent() {
 
 export default function BillsOfLadingPage() {
   return (
-    <AuthGuard>
-      <BillsOfLadingPageContent />
-    </AuthGuard>
+    <BillsOfLadingPageContent />
   );
 }

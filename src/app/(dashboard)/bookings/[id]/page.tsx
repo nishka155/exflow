@@ -35,7 +35,6 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { DocumentList } from "@/components/shared/document-list";
 import { BookingComments } from "@/components/modules/booking-comments";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import {
   BOOKING_STAGE_CONFIG,
@@ -294,8 +293,6 @@ export default function BookingMasterPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
 
   return (
-    <AuthGuard>
-      <BookingMasterPageContent id={id} />
-    </AuthGuard>
+    <BookingMasterPageContent id={id} />
   );
 }

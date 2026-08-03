@@ -5,7 +5,6 @@ import { Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { GateInForm } from "@/components/modules/gate-in-form";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import type { FactoryStuffing, Booking, Customer } from "@prisma/client";
 
@@ -33,8 +32,6 @@ function NewGateInPageContent() {
 
 export default function NewGateInPage() {
   return (
-    <AuthGuard>
-      <NewGateInPageContent />
-    </AuthGuard>
+    <NewGateInPageContent />
   );
 }

@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StuffingGrid, type StuffingRow } from "@/components/modules/stuffing-grid";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api, ApiError } from "@/lib/api/client";
 
 type BookingOption = Booking & { customer: Customer };
@@ -116,10 +115,8 @@ function StuffingPageContent() {
 
 export default function StuffingPage() {
   return (
-    <AuthGuard>
-      <React.Suspense fallback={null}>
-        <StuffingPageContent />
-      </React.Suspense>
-    </AuthGuard>
+    <React.Suspense fallback={null}>
+      <StuffingPageContent />
+    </React.Suspense>
   );
 }

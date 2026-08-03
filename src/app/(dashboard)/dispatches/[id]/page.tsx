@@ -11,7 +11,6 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { DocumentList } from "@/components/shared/document-list";
 import { DocumentUploader } from "@/components/shared/document-uploader";
 import { DispatchActions } from "@/components/modules/dispatch-actions";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api/client";
 import { DISPATCH_STATUS_CONFIG, type DispatchStatus } from "@/lib/constants/statuses";
@@ -23,7 +22,6 @@ interface DispatchDetail {
   driverName: string;
   driverMobile: string;
   referenceNumber: string | null;
-  lrNumber: string | null;
   material: string;
   numberOfBlocks: number | null;
   numberOfWeights: string | null;
@@ -92,7 +90,6 @@ function DispatchDetailPageContent() {
             <Field label="Driver Mobile" value={dispatch.driverMobile} />
             <Field label="Transporter" value={dispatch.transporter.name} />
             <Field label="Reference Number" value={dispatch.referenceNumber ?? "—"} />
-            <Field label="LR Number" value={dispatch.lrNumber ?? "—"} />
             <Field label="Material" value={dispatch.material} />
             <Field label="Number of Blocks" value={dispatch.numberOfBlocks ?? "—"} />
             <Field
@@ -158,8 +155,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function DispatchDetailPage() {
   return (
-    <AuthGuard>
-      <DispatchDetailPageContent />
-    </AuthGuard>
+    <DispatchDetailPageContent />
   );
 }

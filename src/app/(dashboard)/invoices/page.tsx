@@ -17,7 +17,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import { INVOICE_STATUS_CONFIG, type InvoiceStatus } from "@/lib/constants/statuses";
 
@@ -112,8 +111,6 @@ function InvoicesPageContent() {
 
 export default function InvoicesPage() {
   return (
-    <AuthGuard>
-      <InvoicesPageContent />
-    </AuthGuard>
+    <InvoicesPageContent />
   );
 }

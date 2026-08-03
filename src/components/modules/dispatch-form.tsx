@@ -61,7 +61,6 @@ export function DispatchForm({
       transporterId,
       material: formData.get("material"),
       referenceNumber: formData.get("referenceNumber") || undefined,
-      lrNumber: formData.get("lrNumber") || undefined,
       numberOfWeights: formData.get("numberOfWeights") || undefined,
       numberOfBlocks: formData.get("numberOfBlocks") || undefined,
       dispatchDate: formData.get("dispatchDate"),
@@ -103,10 +102,6 @@ export function DispatchForm({
           <div className="space-y-2">
             <Label htmlFor="referenceNumber">Reference Number</Label>
             <Input id="referenceNumber" name="referenceNumber" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="lrNumber">LR Number</Label>
-            <Input id="lrNumber" name="lrNumber" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="driverName">Driver Name</Label>

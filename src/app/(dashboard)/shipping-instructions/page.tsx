@@ -17,7 +17,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import { SI_STATUS_CONFIG, type SIStatus } from "@/lib/constants/statuses";
 
@@ -105,8 +104,6 @@ function ShippingInstructionsPageContent() {
 
 export default function ShippingInstructionsPage() {
   return (
-    <AuthGuard>
-      <ShippingInstructionsPageContent />
-    </AuthGuard>
+    <ShippingInstructionsPageContent />
   );
 }

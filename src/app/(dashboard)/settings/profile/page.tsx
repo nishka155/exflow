@@ -2,7 +2,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProfileForm } from "@/components/modules/profile-form";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { ROLE_LABELS, type Role } from "@/lib/constants/roles";
 
@@ -32,8 +31,6 @@ function ProfilePageContent() {
 
 export default function ProfilePage() {
   return (
-    <AuthGuard>
-      <ProfilePageContent />
-    </AuthGuard>
+    <ProfilePageContent />
   );
 }

@@ -9,7 +9,6 @@ import { Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -157,8 +156,6 @@ function SobDetailPageContent() {
 
 export default function SobDetailPage() {
   return (
-    <AuthGuard>
-      <SobDetailPageContent />
-    </AuthGuard>
+    <SobDetailPageContent />
   );
 }

@@ -16,7 +16,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 
 interface CustomerListItem {
@@ -96,8 +95,6 @@ function CustomersPageContent() {
 
 export default function CustomersPage() {
   return (
-    <AuthGuard>
-      <CustomersPageContent />
-    </AuthGuard>
+    <CustomersPageContent />
   );
 }

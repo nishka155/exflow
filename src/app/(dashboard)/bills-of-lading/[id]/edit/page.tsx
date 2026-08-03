@@ -6,7 +6,6 @@ import { Loader2 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { BillOfLadingForm, type BLFormValues } from "@/components/modules/bill-of-lading-form";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 
 function EditBillOfLadingPageContent() {
@@ -47,8 +46,6 @@ function EditBillOfLadingPageContent() {
 
 export default function EditBillOfLadingPage() {
   return (
-    <AuthGuard>
-      <EditBillOfLadingPageContent />
-    </AuthGuard>
+    <EditBillOfLadingPageContent />
   );
 }

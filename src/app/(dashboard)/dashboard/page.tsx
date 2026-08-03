@@ -28,7 +28,6 @@ import { BookingsByStageChart } from "@/components/dashboard/bookings-by-stage-c
 import { ExportCountryChart } from "@/components/dashboard/export-country-chart";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { AtRiskDispatchesCard } from "@/components/dashboard/at-risk-dispatches-card";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { api } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { roleCanAccess, type Role } from "@/lib/constants/roles";
@@ -251,8 +250,6 @@ function DashboardPageContent() {
 
 export default function DashboardPage() {
   return (
-    <AuthGuard>
-      <DashboardPageContent />
-    </AuthGuard>
+    <DashboardPageContent />
   );
 }

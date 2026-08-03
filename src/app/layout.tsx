@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AccentProvider, AccentScript } from "@/components/accent-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
@@ -33,6 +34,9 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <AccentScript />
+      </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider
           attribute="class"
@@ -40,12 +44,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Providers>
-            <TooltipProvider delay={200}>
-              {children}
-              <Toaster richColors closeButton position="top-right" />
-            </TooltipProvider>
-          </Providers>
+          <AccentProvider>
+            <Providers>
+              <TooltipProvider delay={200}>
+                {children}
+                <Toaster richColors closeButton position="top-right" />
+              </TooltipProvider>
+            </Providers>
+          </AccentProvider>
         </ThemeProvider>
       </body>
     </html>

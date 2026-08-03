@@ -11,7 +11,6 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { DocumentList } from "@/components/shared/document-list";
 import { DocumentUploader } from "@/components/shared/document-uploader";
 import { InvoiceActions } from "@/components/modules/invoice-actions";
-import { AuthGuard } from "@/components/auth/auth-guard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api/client";
 import { INVOICE_STATUS_CONFIG, type InvoiceStatus } from "@/lib/constants/statuses";
@@ -237,8 +236,6 @@ function Field({
 
 export default function InvoiceDetailPage() {
   return (
-    <AuthGuard>
-      <InvoiceDetailPageContent />
-    </AuthGuard>
+    <InvoiceDetailPageContent />
   );
 }
