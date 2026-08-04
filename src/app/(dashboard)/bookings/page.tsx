@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Boxes, Loader2, Plus } from "lucide-react";
+import { Boxes, Loader2, Plus, Upload } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -40,10 +40,16 @@ function BookingsPageContent() {
         title="Bookings"
         description="The single record for every export booking, start to finish."
         actions={
-          <Button nativeButton={false} render={<Link href="/bookings/new" />}>
-            <Plus />
-            New Booking
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" nativeButton={false} render={<Link href="/bookings/import" />}>
+              <Upload />
+              Import
+            </Button>
+            <Button nativeButton={false} render={<Link href="/bookings/new" />}>
+              <Plus />
+              New Booking
+            </Button>
+          </div>
         }
       />
 
