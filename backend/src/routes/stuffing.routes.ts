@@ -66,6 +66,7 @@ router.post("/", async (req, res, next) => {
 
     const booking = await prisma.booking.findFirst({
       where: { id: data.bookingId, organizationId: user.organizationId },
+      include: { customer: true },
     });
     if (!booking) throw new HttpError(404, "Booking not found");
 
@@ -110,7 +111,10 @@ router.post("/", async (req, res, next) => {
       },
     });
 
-    res.status(201).json(stuffing);
+    res.status(201).json({
+      ...stuffing,
+      booking: { bookingNumber: booking.bookingNumber, customer: { name: booking.customer.name } },
+    });
   } catch (err) {
     next(err);
   }

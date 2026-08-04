@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   useReactTable,
   getCoreRowModel,
@@ -22,7 +23,7 @@ import {
   Upload,
   Download,
 } from "lucide-react";
-import type { Transporter } from "@prisma/client";
+import type { Booking, Customer, Transporter } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,8 +38,12 @@ import {
 import { api, ApiError } from "@/lib/api/client";
 import { parseCsv, toCsv, downloadCsv } from "@/lib/csv";
 
+type BookingOption = Booking & { customer: Customer };
+
 export interface StuffingRow {
   id: string;
+  bookingId: string;
+  booking: { bookingNumber: string; customer: { name: string } };
   containerNumber: string;
   containerSize: string;
   commodity: string | null;
@@ -56,6 +61,32 @@ export interface StuffingRow {
   status: string;
 }
 
+type DisplayRow = StuffingRow & { isDraft?: boolean };
+
+function emptyDraft(id: string): DisplayRow {
+  return {
+    id,
+    bookingId: "",
+    booking: { bookingNumber: "", customer: { name: "" } },
+    containerNumber: "",
+    containerSize: "FT40",
+    commodity: null,
+    sealNumber: null,
+    numberOfBoxes: null,
+    numberOfBlocks: null,
+    grossWeight: null,
+    netWeight: null,
+    pol: "",
+    pod: "",
+    deliveryDate: null,
+    transporterId: null,
+    contactNumber: null,
+    stuffingStartTime: null,
+    status: "SCHEDULED",
+    isDraft: true,
+  };
+}
+
 const CONTAINER_SIZES = [
   { value: "FT20", label: "20 FT" },
   { value: "FT40", label: "40 FT" },
@@ -69,6 +100,7 @@ const STATUSES = [
 ];
 
 const CSV_HEADERS = [
+  "Booking",
   "Container No.",
   "Size",
   "Commodity",
@@ -91,8 +123,9 @@ function toDateInput(iso: string | null) {
 }
 
 // Column order for the text/number/date inputs that participate in
-// left/right arrow-key navigation (select-based cells — size, transporter,
-// status — are reached by Tab instead, since they aren't text inputs).
+// left/right arrow-key navigation (select-based cells — booking, size,
+// transporter, status — are reached by Tab instead, since they aren't
+// text inputs).
 const NAV_COLUMNS = [
   "containerNumber",
   "commodity",
@@ -130,6 +163,7 @@ function GridInput({
   colKey,
   containerRef,
   className,
+  disabled,
 }: {
   value: string;
   onSave: (next: string) => void;
@@ -138,12 +172,17 @@ function GridInput({
   colKey: string;
   containerRef: React.RefObject<HTMLDivElement | null>;
   className?: string;
+  disabled?: boolean;
 }) {
   const [local, setLocal] = React.useState(value);
 
   React.useEffect(() => {
     setLocal(value);
   }, [value]);
+
+  if (disabled) {
+    return <span className="pl-2.5 text-xs text-muted-foreground">—</span>;
+  }
 
   function commit() {
     if (local !== value) onSave(local);
@@ -195,13 +234,11 @@ function GridInput({
 export function StuffingGrid({
   rows,
   transporters,
-  bookingId,
-  onAdded,
+  bookings,
 }: {
   rows: StuffingRow[];
   transporters: Transporter[];
-  bookingId: string;
-  onAdded?: (id: string) => void;
+  bookings: BookingOption[];
 }) {
   const queryClient = useQueryClient();
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -211,17 +248,19 @@ export function StuffingGrid({
   const [statusFilter, setStatusFilter] = React.useState("ALL");
   const [sizeFilter, setSizeFilter] = React.useState("ALL");
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
+  const [draftRows, setDraftRows] = React.useState<DisplayRow[]>([]);
+  const draftCounter = React.useRef(0);
 
-  const queryKey = React.useMemo(() => ["stuffings", { bookingId }] as const, [bookingId]);
+  const queryKey = ["stuffings"] as const;
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["stuffings"] });
   }
 
   // Patch the already-loaded row list directly from each mutation's response
-  // instead of invalidating + refetching the whole booking's containers —
-  // editing one cell in a 30-row grid shouldn't cost a full round-trip and
-  // full re-render just to reflect that one change.
+  // instead of invalidating + refetching the whole list — editing one cell
+  // in a large grid shouldn't cost a full round-trip and full re-render
+  // just to reflect that one change.
   function patchRow(updated: StuffingRow) {
     queryClient.setQueryData<StuffingRow[]>(queryKey, (old) =>
       old?.map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
@@ -255,17 +294,18 @@ export function StuffingGrid({
     },
   });
 
-  const duplicateMutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
       api.post<StuffingRow>("/api/stuffing", data),
-    onSuccess: (created) => {
+    onSuccess: (created, variables) => {
       queryClient.setQueryData<StuffingRow[]>(queryKey, (old) =>
         old ? [created, ...old] : [created]
       );
-      onAdded?.(created.id);
+      const draftId = (variables as { __draftId?: string }).__draftId;
+      if (draftId) setDraftRows((prev) => prev.filter((d) => d.id !== draftId));
     },
     onError: (err) => {
-      toast.error(err instanceof ApiError ? err.message : "Could not duplicate container");
+      toast.error(err instanceof ApiError ? err.message : "Could not create container");
     },
   });
 
@@ -276,9 +316,22 @@ export function StuffingGrid({
     });
   }
 
+  function handleAddContainer() {
+    draftCounter.current += 1;
+    setDraftRows((prev) => [...prev, emptyDraft(`draft-${draftCounter.current}`)]);
+  }
+
+  function handleDraftBookingChosen(draftId: string, bookingId: string) {
+    createMutation.mutate({ bookingId, __draftId: draftId });
+  }
+
+  function handleRemoveDraft(draftId: string) {
+    setDraftRows((prev) => prev.filter((d) => d.id !== draftId));
+  }
+
   function handleDuplicate(row: StuffingRow) {
-    duplicateMutation.mutate({
-      bookingId,
+    createMutation.mutate({
+      bookingId: row.bookingId,
       containerNumber: row.containerNumber ? `${row.containerNumber} (Copy)` : undefined,
       containerSize: row.containerSize,
       commodity: row.commodity || undefined,
@@ -295,22 +348,29 @@ export function StuffingGrid({
   }
 
   async function handleBulkDelete(ids: string[]) {
-    const results = await Promise.allSettled(ids.map((id) => deleteMutation.mutateAsync(id)));
-    const failed = results.filter((r) => r.status === "rejected").length;
-    if (failed > 0) invalidate();
-    setRowSelection({});
-    if (failed === 0) {
-      toast.success(`Deleted ${ids.length} container${ids.length === 1 ? "" : "s"}`);
-    } else {
-      toast.error(
-        `Deleted ${ids.length - failed} of ${ids.length} — ${failed} could not be deleted (likely already gated in)`
-      );
+    const realIds = ids.filter((id) => !id.startsWith("draft-"));
+    const draftIds = ids.filter((id) => id.startsWith("draft-"));
+    if (draftIds.length) setDraftRows((prev) => prev.filter((d) => !draftIds.includes(d.id)));
+
+    if (realIds.length) {
+      const results = await Promise.allSettled(realIds.map((id) => deleteMutation.mutateAsync(id)));
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) invalidate();
+      if (failed === 0) {
+        toast.success(`Deleted ${realIds.length} container${realIds.length === 1 ? "" : "s"}`);
+      } else {
+        toast.error(
+          `Deleted ${realIds.length - failed} of ${realIds.length} — ${failed} could not be deleted (likely already gated in)`
+        );
+      }
     }
+    setRowSelection({});
   }
 
   function handleExport() {
-    const visibleRows = table.getRowModel().rows.map((r) => r.original);
+    const visibleRows = table.getRowModel().rows.map((r) => r.original).filter((r) => !r.isDraft);
     const csvRows = visibleRows.map((r) => [
+      r.booking.bookingNumber,
       r.containerNumber,
       r.containerSize,
       r.commodity ?? "",
@@ -344,10 +404,16 @@ export function StuffingGrid({
       return;
     }
     let created = 0;
+    let skipped = 0;
     for (const rec of records) {
+      const booking = bookings.find((b) => b.bookingNumber === rec["Booking"]?.trim());
+      if (!booking) {
+        skipped++;
+        continue;
+      }
       try {
         await api.post("/api/stuffing", {
-          bookingId,
+          bookingId: booking.id,
           containerNumber: rec["Container No."] || undefined,
           containerSize: rec["Size"]?.replace(" ", "_").toUpperCase() || undefined,
           commodity: rec["Commodity"] || undefined,
@@ -363,14 +429,17 @@ export function StuffingGrid({
         });
         created++;
       } catch {
-        // continue importing remaining rows
+        skipped++;
       }
     }
     invalidate();
-    toast.success(`Imported ${created} of ${records.length} rows`);
+    toast.success(
+      `Imported ${created} of ${records.length} rows` +
+        (skipped ? ` — ${skipped} skipped (unmatched booking or error)` : "")
+    );
   }
 
-  const columns = React.useMemo<ColumnDef<StuffingRow>[]>(
+  const columns = React.useMemo<ColumnDef<DisplayRow>[]>(
     () => [
       {
         id: "select",
@@ -390,6 +459,44 @@ export function StuffingGrid({
         ),
       },
       {
+        id: "booking",
+        header: "Booking",
+        cell: ({ row }) => {
+          if (row.original.isDraft) {
+            return (
+              <Select
+                value={row.original.bookingId || undefined}
+                onValueChange={(v) => v && handleDraftBookingChosen(row.original.id, v)}
+              >
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue placeholder="Pick a booking…">
+                    {(value: string | null) => {
+                      const b = bookings.find((b) => b.id === value);
+                      return b ? `${b.bookingNumber} · ${b.customer.name}` : null;
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {bookings.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.bookingNumber} · {b.customer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          }
+          return (
+            <Link
+              href={`/bookings/${row.original.bookingId}`}
+              className="whitespace-nowrap px-2.5 text-xs text-brand hover:underline"
+            >
+              {row.original.booking.bookingNumber}
+            </Link>
+          );
+        },
+      },
+      {
         accessorKey: "containerNumber",
         header: "Container No.",
         cell: ({ row }) => (
@@ -399,6 +506,7 @@ export function StuffingGrid({
             colKey="containerNumber"
             containerRef={containerRef}
             className="h-8 min-w-[8rem] font-medium text-xs"
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "containerNumber", v)}
           />
         ),
@@ -406,27 +514,30 @@ export function StuffingGrid({
       {
         accessorKey: "containerSize",
         header: "Size",
-        cell: ({ row }) => (
-          <Select
-            value={row.original.containerSize}
-            onValueChange={(v) => v && saveField(row.original.id, "containerSize", v)}
-          >
-            <SelectTrigger className="h-8 w-[5.5rem] text-xs">
-              <SelectValue>
-                {(value: string | null) =>
-                  CONTAINER_SIZES.find((c) => c.value === value)?.label ?? null
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {CONTAINER_SIZES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ),
+        cell: ({ row }) =>
+          row.original.isDraft ? (
+            <span className="pl-2.5 text-xs text-muted-foreground">—</span>
+          ) : (
+            <Select
+              value={row.original.containerSize}
+              onValueChange={(v) => v && saveField(row.original.id, "containerSize", v)}
+            >
+              <SelectTrigger className="h-8 w-[5.5rem] text-xs">
+                <SelectValue>
+                  {(value: string | null) =>
+                    CONTAINER_SIZES.find((c) => c.value === value)?.label ?? null
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {CONTAINER_SIZES.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ),
       },
       {
         accessorKey: "commodity",
@@ -437,6 +548,7 @@ export function StuffingGrid({
             rowIndex={row.index}
             colKey="commodity"
             containerRef={containerRef}
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "commodity", v)}
           />
         ),
@@ -450,6 +562,7 @@ export function StuffingGrid({
             rowIndex={row.index}
             colKey="sealNumber"
             containerRef={containerRef}
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "sealNumber", v)}
           />
         ),
@@ -465,6 +578,7 @@ export function StuffingGrid({
             colKey="numberOfBoxes"
             containerRef={containerRef}
             className="h-8 w-20 text-xs"
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "numberOfBoxes", v, true)}
           />
         ),
@@ -480,6 +594,7 @@ export function StuffingGrid({
             colKey="numberOfBlocks"
             containerRef={containerRef}
             className="h-8 w-20 text-xs"
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "numberOfBlocks", v, true)}
           />
         ),
@@ -495,6 +610,7 @@ export function StuffingGrid({
             colKey="grossWeight"
             containerRef={containerRef}
             className="h-8 w-24 text-xs"
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "grossWeight", v, true)}
           />
         ),
@@ -510,6 +626,7 @@ export function StuffingGrid({
             colKey="netWeight"
             containerRef={containerRef}
             className="h-8 w-24 text-xs"
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "netWeight", v, true)}
           />
         ),
@@ -523,6 +640,7 @@ export function StuffingGrid({
             rowIndex={row.index}
             colKey="pol"
             containerRef={containerRef}
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "pol", v)}
           />
         ),
@@ -536,6 +654,7 @@ export function StuffingGrid({
             rowIndex={row.index}
             colKey="pod"
             containerRef={containerRef}
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "pod", v)}
           />
         ),
@@ -551,6 +670,7 @@ export function StuffingGrid({
             colKey="deliveryDate"
             containerRef={containerRef}
             className="h-8 w-36 text-xs"
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "deliveryDate", v)}
           />
         ),
@@ -558,25 +678,28 @@ export function StuffingGrid({
       {
         accessorKey: "transporterId",
         header: "Transporter",
-        cell: ({ row }) => (
-          <Select
-            value={row.original.transporterId ?? ""}
-            onValueChange={(v) => saveField(row.original.id, "transporterId", v ?? "")}
-          >
-            <SelectTrigger className="h-8 w-[9rem] text-xs">
-              <SelectValue placeholder="—">
-                {(value: string | null) => transporters.find((t) => t.id === value)?.name ?? null}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {transporters.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ),
+        cell: ({ row }) =>
+          row.original.isDraft ? (
+            <span className="pl-2.5 text-xs text-muted-foreground">—</span>
+          ) : (
+            <Select
+              value={row.original.transporterId ?? ""}
+              onValueChange={(v) => saveField(row.original.id, "transporterId", v ?? "")}
+            >
+              <SelectTrigger className="h-8 w-[9rem] text-xs">
+                <SelectValue placeholder="—">
+                  {(value: string | null) => transporters.find((t) => t.id === value)?.name ?? null}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {transporters.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ),
       },
       {
         accessorKey: "contactNumber",
@@ -587,6 +710,7 @@ export function StuffingGrid({
             rowIndex={row.index}
             colKey="contactNumber"
             containerRef={containerRef}
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "contactNumber", v)}
           />
         ),
@@ -602,6 +726,7 @@ export function StuffingGrid({
             colKey="stuffingStartTime"
             containerRef={containerRef}
             className="h-8 w-36 text-xs"
+            disabled={row.original.isDraft}
             onSave={(v) => saveField(row.original.id, "stuffingStartTime", v)}
           />
         ),
@@ -609,44 +734,53 @@ export function StuffingGrid({
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => (
-          <Select
-            value={row.original.status}
-            onValueChange={(v) => v && statusMutation.mutate({ id: row.original.id, status: v })}
-          >
-            <SelectTrigger className="h-8 w-[8rem] text-xs">
-              <SelectValue>
-                {(value: string | null) => STATUSES.find((s) => s.value === value)?.label ?? null}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {STATUSES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>
-                  {s.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ),
+        cell: ({ row }) =>
+          row.original.isDraft ? (
+            <span className="pl-2.5 text-xs text-muted-foreground">—</span>
+          ) : (
+            <Select
+              value={row.original.status}
+              onValueChange={(v) => v && statusMutation.mutate({ id: row.original.id, status: v })}
+            >
+              <SelectTrigger className="h-8 w-[8rem] text-xs">
+                <SelectValue>
+                  {(value: string | null) => STATUSES.find((s) => s.value === value)?.label ?? null}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {STATUSES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ),
       },
       {
         id: "actions",
         header: "Actions",
         cell: ({ row }) => (
           <div className="flex items-center justify-end gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Duplicate"
-              onClick={() => handleDuplicate(row.original)}
-            >
-              <Copy />
-            </Button>
+            {!row.original.isDraft && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Duplicate"
+                onClick={() => handleDuplicate(row.original)}
+              >
+                <Copy />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon-sm"
               aria-label="Delete"
-              onClick={() => handleBulkDelete([row.original.id])}
+              onClick={() =>
+                row.original.isDraft
+                  ? handleRemoveDraft(row.original.id)
+                  : handleBulkDelete([row.original.id])
+              }
             >
               <Trash2 />
             </Button>
@@ -655,18 +789,19 @@ export function StuffingGrid({
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [transporters]
+    [transporters, bookings]
   );
 
-  const filteredRows = React.useMemo(() => {
-    return rows.filter((r) => {
+  const filteredRows = React.useMemo<DisplayRow[]>(() => {
+    const real = rows.filter((r) => {
       if (statusFilter !== "ALL" && r.status !== statusFilter) return false;
       if (sizeFilter !== "ALL" && r.containerSize !== sizeFilter) return false;
       return true;
     });
-  }, [rows, statusFilter, sizeFilter]);
+    return [...draftRows, ...real];
+  }, [rows, draftRows, statusFilter, sizeFilter]);
 
-  const table = useReactTable({
+  const table = useReactTable<DisplayRow>({
     data: filteredRows,
     columns,
     state: { sorting, globalFilter, rowSelection },
@@ -678,6 +813,7 @@ export function StuffingGrid({
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     globalFilterFn: (row, _columnId, filterValue) => {
+      if (row.original.isDraft) return true;
       const q = String(filterValue).toLowerCase();
       const r = row.original;
       return [
@@ -687,6 +823,8 @@ export function StuffingGrid({
         r.pol,
         r.pod,
         r.contactNumber,
+        r.booking.bookingNumber,
+        r.booking.customer.name,
       ]
         .filter(Boolean)
         .some((v) => v!.toLowerCase().includes(q));
@@ -760,9 +898,17 @@ export function StuffingGrid({
             <Upload />
             Import
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={rows.length === 0}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={rows.length === 0}
+          >
             <Download />
             Export
+          </Button>
+          <Button size="sm" onClick={handleAddContainer}>
+            Add Container
           </Button>
         </div>
       </div>
@@ -803,7 +949,7 @@ export function StuffingGrid({
             {table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="py-10 text-center text-sm text-muted-foreground">
-                  No containers match your filters.
+                  No containers yet — click Add Container to get started.
                 </td>
               </tr>
             ) : (
