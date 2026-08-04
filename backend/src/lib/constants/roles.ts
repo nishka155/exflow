@@ -51,6 +51,7 @@ export const ROLE_MODULES: Record<Role, string[]> = {
     "documents",
     "customers",
     "reports",
+    "settings",
   ],
   DOCUMENTATION_EXECUTIVE: [
     "dashboard",
@@ -60,10 +61,11 @@ export const ROLE_MODULES: Record<Role, string[]> = {
     "bookings",
     "documents",
     "reports",
+    "settings",
   ],
-  FACTORY_USER: ["dashboard", "stuffing", "gate-in", "bookings", "documents"],
-  TRANSPORT_COORDINATOR: ["dashboard", "dispatches", "bookings", "documents"],
-  ACCOUNTS: ["dashboard", "invoices", "customers", "reports"],
+  FACTORY_USER: ["dashboard", "stuffing", "gate-in", "bookings", "documents", "settings"],
+  TRANSPORT_COORDINATOR: ["dashboard", "dispatches", "bookings", "documents", "settings"],
+  ACCOUNTS: ["dashboard", "invoices", "customers", "reports", "settings"],
   CUSTOMER: ["portal"],
 };
 

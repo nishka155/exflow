@@ -8,6 +8,7 @@ export function SettingsNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const items = [
     { href: "/settings/profile", label: "Profile" },
+    { href: "/settings/appearance", label: "Appearance" },
     ...(isAdmin ? [{ href: "/settings/users", label: "Users" }] : []),
   ];
 
