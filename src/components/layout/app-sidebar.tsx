@@ -26,13 +26,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { NAV_SECTIONS } from "@/lib/constants/nav";
+import { NAV_SECTIONS, NAV_TONE_STYLES } from "@/lib/constants/nav";
 import { ROLE_LABELS, type Role, roleCanAccess } from "@/lib/constants/roles";
 import {
   Avatar,
   AvatarFallback,
 } from "@/components/ui/avatar";
 import { useAuthStore } from "@/lib/store/auth-store";
+import { cn } from "@/lib/utils";
 
 export function AppSidebar({
   role,
@@ -59,7 +60,7 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-[0_2px_10px_var(--brand-glow)]">
                 <Ship className="size-4" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -87,15 +88,31 @@ export function AppSidebar({
                     const isActive =
                       pathname === item.href ||
                       pathname.startsWith(`${item.href}/`);
+                    const tone = NAV_TONE_STYLES[item.tone];
                     return (
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton
                           render={<Link href={item.href} />}
                           isActive={isActive}
                           tooltip={item.title}
+                          className={cn(
+                            "group relative transition-colors duration-150",
+                            isActive
+                              ? "before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-[var(--sidebar-primary)] before:shadow-[0_0_6px_var(--brand-glow)]"
+                              : tone.hoverBg
+                          )}
                         >
-                          <item.icon />
+                          <item.icon className={cn(!isActive && tone.icon)} />
                           <span>{item.title}</span>
+                          {!isActive && (
+                            <span
+                              aria-hidden
+                              className={cn(
+                                "ml-auto size-1.5 shrink-0 rounded-full opacity-40 transition-opacity group-hover:opacity-100 group-data-[collapsible=icon]:hidden",
+                                tone.dot
+                              )}
+                            />
+                          )}
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );

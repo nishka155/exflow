@@ -2,12 +2,42 @@
 
 import * as React from "react";
 
+/** `swatch` is a two-stop gradient (for a bit of depth in the picker),
+ *  `glow` is the flat color used for the hover/selected shadow. Both
+ *  are derived from the same hue as the corresponding globals.css
+ *  accent block, kept in sync by hand since one lives in CSS and the
+ *  other needs a JS value for inline styles. */
 export const ACCENTS = [
-  { value: "blue", label: "Blue", swatch: "oklch(0.541 0.204 268.9)" },
-  { value: "green", label: "Green", swatch: "oklch(0.541 0.204 152)" },
-  { value: "violet", label: "Violet", swatch: "oklch(0.541 0.204 300)" },
-  { value: "rose", label: "Rose", swatch: "oklch(0.541 0.204 18)" },
-  { value: "amber", label: "Amber", swatch: "oklch(0.541 0.204 75)" },
+  {
+    value: "blue",
+    label: "Blue",
+    swatch: "linear-gradient(135deg, oklch(0.64 0.19 268.9), oklch(0.44 0.21 268.9))",
+    glow: "oklch(0.541 0.204 268.9)",
+  },
+  {
+    value: "green",
+    label: "Green",
+    swatch: "linear-gradient(135deg, oklch(0.64 0.19 152), oklch(0.44 0.21 152))",
+    glow: "oklch(0.541 0.204 152)",
+  },
+  {
+    value: "violet",
+    label: "Violet",
+    swatch: "linear-gradient(135deg, oklch(0.64 0.19 300), oklch(0.44 0.21 300))",
+    glow: "oklch(0.541 0.204 300)",
+  },
+  {
+    value: "rose",
+    label: "Rose",
+    swatch: "linear-gradient(135deg, oklch(0.64 0.19 18), oklch(0.44 0.21 18))",
+    glow: "oklch(0.541 0.204 18)",
+  },
+  {
+    value: "amber",
+    label: "Amber",
+    swatch: "linear-gradient(135deg, oklch(0.64 0.19 75), oklch(0.44 0.21 75))",
+    glow: "oklch(0.541 0.204 75)",
+  },
 ] as const;
 
 export type Accent = (typeof ACCENTS)[number]["value"];

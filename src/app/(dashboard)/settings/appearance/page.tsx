@@ -1,5 +1,6 @@
 "use client";
 
+import type * as React from "react";
 import { useTheme } from "next-themes";
 import { Check, Laptop, Moon, Sun } from "lucide-react";
 
@@ -36,9 +37,9 @@ export default function AppearanceSettingsPage() {
                   type="button"
                   onClick={() => setTheme(m.value)}
                   className={cn(
-                    "flex flex-col items-center gap-2 rounded-lg border px-3 py-4 text-sm transition-colors",
+                    "flex flex-col items-center gap-2 rounded-lg border px-3 py-4 text-sm transition-all",
                     active
-                      ? "border-primary bg-primary/5 font-medium text-foreground"
+                      ? "border-[var(--brand)] bg-[color-mix(in_oklch,var(--brand)_8%,transparent)] font-medium text-foreground shadow-[0_0_0_1px_var(--brand),0_4px_16px_-4px_var(--brand-glow)]"
                       : "border-border text-muted-foreground hover:bg-muted/60"
                   )}
                 >
@@ -60,18 +61,19 @@ export default function AppearanceSettingsPage() {
                 aria-label={a.label}
                 onClick={() => setAccent(a.value)}
                 className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-full ring-1 ring-foreground/10 transition-transform hover:scale-110",
-                  accent === a.value && "ring-2 ring-offset-2 ring-offset-background"
+                  "flex size-9 shrink-0 items-center justify-center rounded-full ring-1 ring-foreground/10 transition-all hover:scale-110 hover:shadow-[0_0_14px_var(--swatch-glow)]",
+                  accent === a.value &&
+                    "scale-110 shadow-[0_0_14px_var(--swatch-glow)] ring-2 ring-offset-2 ring-offset-background"
                 )}
-                style={{ backgroundColor: a.swatch }}
+                style={{ background: a.swatch, "--swatch-glow": a.glow } as React.CSSProperties}
                 title={a.label}
               >
-                {accent === a.value && <Check className="size-4 text-white" strokeWidth={3} />}
+                {accent === a.value && <Check className="size-4 text-white drop-shadow" strokeWidth={3} />}
               </button>
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
-            {ACCENTS.find((a) => a.value === accent)?.label} is applied across buttons, links, and highlights.
+            {ACCENTS.find((a) => a.value === accent)?.label} is applied across buttons, links, the sidebar, and highlights.
           </p>
         </div>
       </CardContent>
