@@ -43,7 +43,7 @@ interface PreviewRow {
   customerNameRaw: string;
 }
 
-const SAMPLE_HEADERS = ["Customer", "Exporter Name", "Buyer Name", "POL", "POD", "Shipping Line", "Vessel", "ETD", "ETA", "Freight Terms", "Commodity", "Delivery Date"];
+const SAMPLE_HEADERS = ["Consignee", "Agent Name", "POL", "POD", "Shipping Line", "Vessel", "ETD", "ETA", "Freight Terms", "Commodity", "Delivery Date"];
 
 export function BookingImport({ customers }: { customers: Customer[] }) {
   const queryClient = useQueryClient();
@@ -132,7 +132,6 @@ export function BookingImport({ customers }: { customers: Customer[] }) {
       [
         "Acme Exports Pvt Ltd",
         "Acme Exports",
-        "Global Buyer Inc",
         "Mundra, India",
         "Rotterdam, Netherlands",
         "Maersk",
@@ -207,7 +206,7 @@ export function BookingImport({ customers }: { customers: Customer[] }) {
                   <>
                     {" "}
                     — <span className="font-semibold text-destructive">{results.failed}</span> row
-                    {results.failed === 1 ? "" : "s"} failed (missing/unmatched customer or a
+                    {results.failed === 1 ? "" : "s"} failed (missing/unmatched consignee or a
                     rejected request)
                   </>
                 )}
@@ -229,7 +228,7 @@ export function BookingImport({ customers }: { customers: Customer[] }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Customer</TableHead>
+                    <TableHead>Consignee</TableHead>
                     {Object.values(BOOKING_FIELD_LABELS).map((label) => (
                       <TableHead key={label}>{label}</TableHead>
                     ))}
@@ -246,7 +245,7 @@ export function BookingImport({ customers }: { customers: Customer[] }) {
                         ) : (
                           <Badge variant="destructive" className="gap-1">
                             <XCircle className="size-3" />
-                            {row.customerNameRaw ? `"${row.customerNameRaw}" not found` : "No customer"}
+                            {row.customerNameRaw ? `"${row.customerNameRaw}" not found` : "No consignee"}
                           </Badge>
                         )}
                       </TableCell>
@@ -263,8 +262,8 @@ export function BookingImport({ customers }: { customers: Customer[] }) {
               </Table>
             </div>
             <p className="text-xs text-muted-foreground">
-              Rows with an unmatched customer will be skipped — fix the name in your file (or add
-              the customer first) and re-import if needed.
+              Rows with an unmatched consignee will be skipped — fix the name in your file (or add
+              the consignee first) and re-import if needed.
             </p>
             <div className="flex items-center gap-2">
               <Button onClick={handleCreateAll} disabled={isCreating || readyCount === 0}>

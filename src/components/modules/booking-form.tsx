@@ -52,7 +52,6 @@ export function BookingForm({
     mutation.mutate({
       customerId,
       exporterName: formData.get("exporterName") || undefined,
-      buyerName: formData.get("buyerName") || undefined,
       pol: formData.get("pol") || undefined,
       pod: formData.get("pod") || undefined,
       shippingLine: formData.get("shippingLine") || undefined,
@@ -75,10 +74,10 @@ export function BookingForm({
       <Card>
         <CardContent className="grid gap-4 sm:grid-cols-2 py-1">
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="customerId">Customer</Label>
+            <Label htmlFor="customerId">Consignee</Label>
             <Select value={customerId} onValueChange={(v) => v && setCustomerId(v)}>
               <SelectTrigger id="customerId" className="w-full">
-                <SelectValue placeholder="Select a customer">
+                <SelectValue placeholder="Select a consignee">
                   {(value: string | null) => customers.find((c) => c.id === value)?.name ?? null}
                 </SelectValue>
               </SelectTrigger>
@@ -92,12 +91,8 @@ export function BookingForm({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="exporterName">Exporter Name</Label>
+            <Label htmlFor="exporterName">Agent Name</Label>
             <Input id="exporterName" name="exporterName" defaultValue={initialValues?.exporterName} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="buyerName">Buyer Name</Label>
-            <Input id="buyerName" name="buyerName" defaultValue={initialValues?.buyerName} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="pol">POL (Port of Loading)</Label>

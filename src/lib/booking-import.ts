@@ -4,7 +4,6 @@ import { parseCsv } from "@/lib/csv";
  *  imported file. Matches the inputs on <BookingForm>. */
 export interface BookingImportValues {
   exporterName?: string;
-  buyerName?: string;
   pol?: string;
   pod?: string;
   shippingLine?: string;
@@ -17,8 +16,7 @@ export interface BookingImportValues {
 }
 
 export const BOOKING_FIELD_LABELS: Record<keyof BookingImportValues, string> = {
-  exporterName: "Exporter Name",
-  buyerName: "Buyer Name",
+  exporterName: "Agent Name",
   pol: "POL",
   pod: "POD",
   shippingLine: "Shipping Line",
@@ -36,9 +34,8 @@ export const BOOKING_FIELD_LABELS: Record<keyof BookingImportValues, string> = {
  *  aliases could apply to the same text. Longest/most-specific aliases
  *  are listed first so e.g. "port of loading" beats a bare "port". */
 const FIELD_ALIASES: Record<"customer" | keyof BookingImportValues, string[]> = {
-  customer: ["customer name", "customer"],
-  exporterName: ["exporter name", "exporter", "shipper name", "shipper"],
-  buyerName: ["buyer name", "buyer", "consignee", "importer", "notify party"],
+  customer: ["consignee name", "consignee", "customer name", "customer"],
+  exporterName: ["agent name", "agent", "exporter name", "exporter", "shipper name", "shipper"],
   pol: ["port of loading", "port of load", "loading port", "origin port", "pol"],
   pod: [
     "port of discharge",
