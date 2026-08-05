@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -20,6 +21,7 @@ import {
 
 import { PageHeader } from "@/components/shared/page-header";
 import { ColorStatCard, HeroStatCard } from "@/components/shared/color-stat-card";
+import { CurrencySelect } from "@/components/shared/currency-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -29,22 +31,36 @@ import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { AtRiskDispatchesCard } from "@/components/dashboard/at-risk-dispatches-card";
 import { api } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/store/auth-store";
+import { useCurrency } from "@/components/currency-provider";
 import { roleCanAccess, type Role } from "@/lib/constants/roles";
 import { QUICK_ACTIONS } from "@/lib/constants/quick-actions";
 import type { DashboardData } from "@/types/dashboard";
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
-
 function DashboardPageContent() {
   const role = useAuthStore((s) => s.user?.role) as Role | undefined;
+  const { currency, setCurrency } = useCurrency();
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => api.get<DashboardData>("/api/dashboard"),
   });
+
+  const currencyFormatter = React.useMemo(() => {
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 0,
+      });
+    } catch {
+      // Guards against a stale/invalid code ever ending up in
+      // localStorage — falls back rather than crashing the dashboard.
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 0,
+      });
+    }
+  }, [currency]);
 
   if (isLoading) {
     return (
@@ -92,6 +108,11 @@ function DashboardPageContent() {
           ))}
         </CardContent>
       </Card>
+
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <span className="text-xs text-muted-foreground">Revenue currency</span>
+        <CurrencySelect value={currency} onChange={setCurrency} />
+      </div>
 
       <div className="mb-6 grid gap-4 lg:grid-cols-4">
         <HeroStatCard
