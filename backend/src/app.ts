@@ -19,6 +19,7 @@ import notificationsRoutes from "./routes/notifications.routes";
 import portalRoutes from "./routes/portal.routes";
 import documentsRoutes from "./routes/documents.routes";
 import profileRoutes from "./routes/profile.routes";
+import debriefRoutes from "./routes/debrief.routes";
 import { errorHandler } from "./middleware/error-handler";
 
 export function createApp() {
@@ -53,6 +54,7 @@ export function createApp() {
   app.use("/api/portal", portalRoutes);
   app.use("/api/documents", documentsRoutes);
   app.use("/api/profile", profileRoutes);
+  app.use("/api/debrief", debriefRoutes);
 
   app.use(errorHandler);
 

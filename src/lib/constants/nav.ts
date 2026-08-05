@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
+  ClipboardCheck,
   FileText,
   Truck,
   Container,
@@ -105,6 +106,13 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: LayoutDashboard,
         moduleKey: "dashboard",
         tone: "indigo",
+      },
+      {
+        title: "Debrief",
+        href: "/debrief",
+        icon: ClipboardCheck,
+        moduleKey: "debrief",
+        tone: "emerald",
       },
       {
         title: "Bookings",

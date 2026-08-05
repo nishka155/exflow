@@ -27,6 +27,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const ROLE_MODULES: Record<Role, string[]> = {
   ADMIN: [
     "dashboard",
+    "debrief",
     "invoices",
     "dispatches",
     "stuffing",
@@ -41,6 +42,7 @@ export const ROLE_MODULES: Record<Role, string[]> = {
   ],
   EXPORT_MANAGER: [
     "dashboard",
+    "debrief",
     "invoices",
     "dispatches",
     "stuffing",
