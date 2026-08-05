@@ -1,10 +1,11 @@
 "use client";
 
+import * as React from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FileDown, Loader2 } from "lucide-react";
+import { FileDown, Loader2, Ship } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -12,6 +13,7 @@ import { DocumentList } from "@/components/shared/document-list";
 import { DocumentUploader } from "@/components/shared/document-uploader";
 import { ShippingInstructionActions } from "@/components/modules/shipping-instruction-actions";
 import { GenerateReportButton } from "@/components/modules/generate-report-button";
+import { BillOfLadingPanel } from "@/components/modules/bill-of-lading-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api/client";
@@ -149,19 +151,6 @@ function ShippingInstructionDetailPageContent() {
                 </Link>
               }
             />
-            {si.billOfLading && (
-              <Field
-                label="Bill of Lading"
-                value={
-                  <Link
-                    href={`/bills-of-lading/${si.billOfLading.id}`}
-                    className="text-brand hover:underline"
-                  >
-                    View BL →
-                  </Link>
-                }
-              />
-            )}
             <Field label="Sent At" value={si.sentAt ? new Date(si.sentAt).toLocaleString() : "—"} />
             <Field label="Created" value={new Date(si.createdAt).toLocaleString()} />
           </CardContent>
@@ -177,7 +166,64 @@ function ShippingInstructionDetailPageContent() {
           <DocumentList documents={si.documents} />
         </CardContent>
       </Card>
+
+      <div className="mt-6">
+        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Bill of Lading</h2>
+        {si.billOfLading ? (
+          <BillOfLadingPanel blId={si.billOfLading.id} />
+        ) : si.status === "CONFIRMED" ? (
+          <GenerateBLCard siId={si.id} />
+        ) : (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              Available once this shipping instruction is confirmed by the shipping line.
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
+  );
+}
+
+/** Creating a BL used to be its own page with a dropdown asking which SI to
+ *  draft one from — pointless here since the SI is already open. One click
+ *  drafts it directly and the panel above swaps in via cache invalidation,
+ *  no navigation needed. */
+function GenerateBLCard({ siId }: { siId: string }) {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: () => api.post("/api/bills-of-lading", { shippingInstructionId: siId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shipping-instruction", siId] });
+      toast.success("Bill of Lading draft generated");
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : "Something went wrong");
+    },
+  });
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+        <Ship className="size-8 text-muted-foreground" />
+        <div>
+          <p className="text-sm font-medium">No Bill of Lading yet</p>
+          <p className="text-sm text-muted-foreground">
+            Generate a draft pre-filled from this shipping instruction — you can edit it afterwards.
+          </p>
+        </div>
+        <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          {mutation.isPending ? (
+            <>
+              <Loader2 className="animate-spin" /> Generating…
+            </>
+          ) : (
+            "Generate Bill of Lading"
+          )}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

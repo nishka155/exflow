@@ -6,7 +6,6 @@ import {
   Container,
   DoorOpen,
   Send,
-  Ship,
   Anchor,
   Boxes,
   FolderOpen,
@@ -153,13 +152,6 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Send,
         moduleKey: "shipping-instructions",
         tone: "violet",
-      },
-      {
-        title: "Bill of Lading",
-        href: "/bills-of-lading",
-        icon: Ship,
-        moduleKey: "bills-of-lading",
-        tone: "sky",
       },
       {
         title: "Shipped on Board",

@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -19,6 +20,12 @@ function EditBillOfLadingPageContent() {
     ),
   });
 
+  React.useEffect(() => {
+    if (bl?.status === "FINAL") {
+      router.replace(`/shipping-instructions/${bl.shippingInstructionId}`);
+    }
+  }, [bl, router]);
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
@@ -32,8 +39,11 @@ function EditBillOfLadingPageContent() {
   }
 
   if (bl.status === "FINAL") {
-    router.replace(`/bills-of-lading/${params.id}`);
-    return null;
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (

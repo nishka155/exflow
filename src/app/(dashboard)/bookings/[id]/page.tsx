@@ -168,9 +168,12 @@ function BookingMasterPageContent({ id }: { id: string }) {
       key: "bl",
       title: "Bill of Lading",
       icon: Ship,
-      href: booking.billOfLading
-        ? `/bills-of-lading/${booking.billOfLading.id}`
-        : "/bills-of-lading/new",
+      // BL lives inline on its Shipping Instruction's page now, not a
+      // standalone one — always route there; the BL section renders itself
+      // (a "Generate BL" prompt, or the full panel once one exists).
+      href: booking.shippingInstruction
+        ? `/shipping-instructions/${booking.shippingInstruction.id}`
+        : "/shipping-instructions/new",
       status: booking.billOfLading ? BL_STATUS_CONFIG[booking.billOfLading.status as BLStatus] : null,
     },
     {

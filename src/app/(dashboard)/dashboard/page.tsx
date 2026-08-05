@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
-import { StatCard } from "@/components/shared/stat-card";
+import { ColorStatCard, HeroStatCard } from "@/components/shared/color-stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -66,6 +66,8 @@ function DashboardPageContent() {
   const { kpis, stageBreakdown, countryBreakdown, recentEvents, notifications, atRiskDispatches } =
     data;
 
+  const stageTotal = stageBreakdown.reduce((sum, s) => sum + s.count, 0);
+
   return (
     <div>
       <PageHeader
@@ -92,84 +94,110 @@ function DashboardPageContent() {
         </CardContent>
       </Card>
 
-      <h2 className="mb-3 text-sm font-medium text-muted-foreground">Bookings</h2>
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
+      <div className="mb-6 grid gap-4 lg:grid-cols-4">
+        <HeroStatCard
           label="Active Bookings"
           value={kpis.activeBookings}
+          subtitle="Booking pipeline, start to finish"
           icon={Boxes}
           href="/bookings"
+          live
         />
-        <StatCard
-          label="Booking Pending"
-          value={kpis.bookingPending}
-          icon={ClipboardList}
-          href="/bookings"
-        />
-        <StatCard
-          label="Bookings This Month"
-          value={kpis.bookingsThisMonth}
-          icon={Boxes}
-          href="/bookings"
-        />
-        <StatCard
-          label="Revenue (Completed)"
-          value={currencyFormatter.format(kpis.revenue)}
-          icon={DollarSign}
-          href="/invoices"
-        />
+        <div className="grid gap-4 sm:grid-cols-3 lg:col-span-3">
+          <ColorStatCard
+            label="Booking Pending"
+            value={kpis.bookingPending}
+            icon={ClipboardList}
+            color="amber"
+            href="/bookings"
+          />
+          <ColorStatCard
+            label="Bookings This Month"
+            value={kpis.bookingsThisMonth}
+            icon={Boxes}
+            color="indigo"
+            href="/bookings"
+          />
+          <ColorStatCard
+            label="Revenue (Completed)"
+            value={currencyFormatter.format(kpis.revenue)}
+            icon={DollarSign}
+            color="emerald"
+            href="/invoices"
+          />
+        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <StatCard
+      <h2 className="mb-3 text-sm font-medium text-muted-foreground">Today&apos;s Pipeline</h2>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <ColorStatCard
           label="Today's Dispatches"
           value={kpis.todaysDispatches}
           icon={Truck}
+          color="sky"
           href="/dispatches"
         />
-        <StatCard
+        <ColorStatCard
           label="Today's Stuffing"
           value={kpis.todaysStuffing}
           icon={Container}
+          color="teal"
           href="/stuffing"
         />
-        <StatCard
+        <ColorStatCard
           label="Containers Waiting"
           value={kpis.containersWaiting}
           icon={Clock}
+          color="amber"
           href="/stuffing"
         />
-        <StatCard
+        <ColorStatCard
           label="Gate In Pending"
           value={kpis.gateInPending}
           icon={DoorOpen}
+          color="orange"
           href="/gate-in"
         />
-        <StatCard
+        <ColorStatCard
           label="Pending SI"
           value={kpis.pendingSI}
           icon={Send}
+          color="violet"
           href="/shipping-instructions"
         />
-        <StatCard label="Pending BL" value={kpis.pendingBL} icon={Ship} href="/bills-of-lading" />
-        <StatCard label="SOB Pending" value={kpis.sobPending} icon={Anchor} href="/sob" />
-        <StatCard
+        <ColorStatCard
+          label="Pending BL"
+          value={kpis.pendingBL}
+          icon={Ship}
+          color="blue"
+          href="/shipping-instructions"
+        />
+        <ColorStatCard
+          label="SOB Pending"
+          value={kpis.sobPending}
+          icon={Anchor}
+          color="indigo"
+          href="/sob"
+        />
+        <ColorStatCard
           label="Containers in Transit"
           value={kpis.containersInTransit}
           icon={Truck}
+          color="sky"
           href="/stuffing"
         />
-        <StatCard
+        <ColorStatCard
           label="Delivered Containers"
           value={kpis.deliveredContainers}
           icon={PackageCheck}
+          color="emerald"
           href="/stuffing"
         />
-        <StatCard
+        <ColorStatCard
           label="Delayed Trucks"
           value={kpis.delayedTrucks}
           icon={AlertTriangle}
-          tone={kpis.delayedTrucks > 0 ? "destructive" : "neutral"}
+          color={kpis.delayedTrucks > 0 ? "rose" : "slate"}
           href="/dispatches"
         />
       </div>
@@ -177,7 +205,10 @@ function DashboardPageContent() {
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Bookings by Stage</CardTitle>
+            <div className="flex items-baseline justify-between">
+              <CardTitle className="text-sm font-medium">Bookings by Stage</CardTitle>
+              <span className="text-xs text-muted-foreground">{stageTotal} total</span>
+            </div>
           </CardHeader>
           <CardContent>
             <BookingsByStageChart data={stageBreakdown} />
@@ -185,7 +216,12 @@ function DashboardPageContent() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Export Countries</CardTitle>
+            <div className="flex items-baseline justify-between">
+              <CardTitle className="text-sm font-medium">Export Countries</CardTitle>
+              <span className="text-xs text-muted-foreground">
+                {countryBreakdown.length} {countryBreakdown.length === 1 ? "country" : "countries"}
+              </span>
+            </div>
           </CardHeader>
           <CardContent>
             {countryBreakdown.length === 0 ? (

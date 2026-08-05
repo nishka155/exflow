@@ -26,7 +26,7 @@ interface SobDetail {
   status: string;
   bookingId: string;
   booking: { bookingNumber: string; customer: { name: string } };
-  billOfLading: { blNumber: string | null };
+  billOfLading: { blNumber: string | null; shippingInstructionId: string };
 }
 
 function SobDetailPageContent() {
@@ -122,7 +122,7 @@ function SobDetailPageContent() {
             <div className="space-y-2">
               <Label>Bill of Lading</Label>
               <Link
-                href={`/bills-of-lading`}
+                href={`/shipping-instructions/${sob.billOfLading.shippingInstructionId}`}
                 className="block text-sm text-brand hover:underline"
               >
                 {sob.billOfLading.blNumber ?? "View BL"}

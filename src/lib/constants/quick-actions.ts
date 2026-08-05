@@ -1,4 +1,4 @@
-import { FilePlus2, Truck, Container, Send, Ship } from "lucide-react";
+import { FilePlus2, Truck, Container, Send } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export interface QuickAction {
@@ -13,5 +13,4 @@ export const QUICK_ACTIONS: QuickAction[] = [
   { title: "Truck Dispatch", href: "/dispatches/new", icon: Truck, moduleKey: "dispatches" },
   { title: "Factory Stuffing", href: "/stuffing", icon: Container, moduleKey: "stuffing" },
   { title: "Generate SI", href: "/shipping-instructions/new", icon: Send, moduleKey: "shipping-instructions" },
-  { title: "Generate BL", href: "/bills-of-lading/new", icon: Ship, moduleKey: "bills-of-lading" },
 ];

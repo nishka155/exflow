@@ -12,6 +12,7 @@ import { api, ApiError } from "@/lib/api/client";
 
 export interface BLFormValues {
   id: string;
+  shippingInstructionId: string;
   blNumber: string | null;
   blDate: string | null;
   consignorName: string;
@@ -39,11 +40,11 @@ export function BillOfLadingForm({ bl }: { bl: BLFormValues }) {
 
   const mutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
-      api.put<{ id: string }>(`/api/bills-of-lading/${bl.id}`, payload),
+      api.put<{ id: string; shippingInstructionId: string }>(`/api/bills-of-lading/${bl.id}`, payload),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["bill-of-lading", data.id] });
-      queryClient.invalidateQueries({ queryKey: ["bills-of-lading"] });
-      router.push(`/bills-of-lading/${data.id}`);
+      queryClient.invalidateQueries({ queryKey: ["shipping-instruction", data.shippingInstructionId] });
+      router.push(`/shipping-instructions/${data.shippingInstructionId}`);
     },
     onError: (err) => {
       setError(err instanceof ApiError ? err.message : "Something went wrong");
