@@ -6,7 +6,6 @@ import {
   Truck,
   Container,
   Clock,
-  Ship,
   Send,
   DoorOpen,
   AlertTriangle,
@@ -163,13 +162,6 @@ function DashboardPageContent() {
           value={kpis.pendingSI}
           icon={Send}
           color="violet"
-          href="/shipping-instructions"
-        />
-        <ColorStatCard
-          label="Pending BL"
-          value={kpis.pendingBL}
-          icon={Ship}
-          color="blue"
           href="/shipping-instructions"
         />
         <ColorStatCard
