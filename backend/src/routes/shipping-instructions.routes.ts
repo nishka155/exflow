@@ -24,6 +24,7 @@ router.get("/", async (req, res, next) => {
       },
       include: { booking: { include: { customer: true } } },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
     res.json(shippingInstructions);
   } catch (err) {

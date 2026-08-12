@@ -26,6 +26,7 @@ router.get("/", async (req, res, next) => {
           : {}),
       },
       orderBy: { name: "asc" },
+      take: 200,
     });
     res.json(items);
   } catch (err) {
@@ -60,6 +61,7 @@ router.get("/:id", async (req, res, next) => {
         createdBy: { select: { id: true, name: true } },
         movements: {
           orderBy: { createdAt: "desc" },
+          take: 50,
           include: {
             recordedBy: { select: { id: true, name: true } },
             booking: { select: { id: true, bookingNumber: true } },

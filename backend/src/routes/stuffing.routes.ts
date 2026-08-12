@@ -30,6 +30,7 @@ router.get("/", async (req, res, next) => {
       },
       include: { booking: { include: { customer: true } }, transporter: true },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
     res.json(stuffings);
   } catch (err) {

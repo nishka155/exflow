@@ -19,6 +19,7 @@ router.get("/", async (req, res, next) => {
       where: { organizationId: req.user!.organizationId },
       include: { booking: { include: { customer: true } } },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
     res.json(gateIns);
   } catch (err) {

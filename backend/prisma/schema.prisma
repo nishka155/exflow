@@ -319,6 +319,7 @@ model Booking {
 
   @@index([organizationId])
   @@index([customerId])
+  @@index([organizationId, currentStage])
   @@map("bookings")
 }
 
@@ -396,6 +397,7 @@ model Invoice {
   @@unique([organizationId, invoiceNumber])
   @@index([organizationId])
   @@index([customerId])
+  @@index([organizationId, status])
   @@map("invoices")
 }
 
@@ -451,6 +453,8 @@ model TruckDispatch {
   @@index([organizationId])
   @@index([bookingId])
   @@index([transporterId])
+  @@index([organizationId, status])
+  @@index([organizationId, expectedFactoryArrival])
   @@map("truck_dispatches")
 }
 
@@ -505,6 +509,7 @@ model FactoryStuffing {
 
   @@index([organizationId])
   @@index([bookingId])
+  @@index([organizationId, status])
   @@map("factory_stuffings")
 }
 
@@ -541,6 +546,7 @@ model GateIn {
 
   @@index([organizationId])
   @@index([bookingId])
+  @@index([organizationId, status])
   @@map("gate_ins")
 }
 
@@ -588,6 +594,7 @@ model ShippingInstruction {
   documents    Document[]
 
   @@index([organizationId])
+  @@index([organizationId, status])
   @@map("shipping_instructions")
 }
 
@@ -636,6 +643,7 @@ model BillOfLading {
   sob       ShippedOnBoard?
 
   @@index([organizationId])
+  @@index([organizationId, status])
   @@map("bills_of_lading")
 }
 
@@ -678,6 +686,7 @@ model ShippedOnBoard {
   updatedAt   DateTime @updatedAt
 
   @@index([organizationId])
+  @@index([organizationId, status])
   @@map("shipped_on_boards")
 }
 

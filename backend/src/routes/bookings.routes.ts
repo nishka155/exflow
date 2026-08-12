@@ -29,6 +29,7 @@ router.get("/", async (req, res, next) => {
         ...(awaitingSI === "true" ? { factoryStuffings: true, gateIns: true } : {}),
       },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
     res.json(bookings);
   } catch (err) {
