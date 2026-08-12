@@ -63,9 +63,3 @@ ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_bookingId_
 
 -- AddForeignKey
 ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_recordedById_fkey" FOREIGN KEY ("recordedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- RenameIndex
-ALTER INDEX "shipments_customerId_idx" RENAME TO "bookings_customerId_idx";
-
--- RenameIndex
-ALTER INDEX "shipments_organizationId_idx" RENAME TO "bookings_organizationId_idx";
