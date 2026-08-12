@@ -72,11 +72,6 @@ enum SobStatus {
   COMPLETED
 }
 
-enum InventoryMovementType {
-  IN
-  OUT
-}
-
 enum BookingStage {
   INVOICE
   DISPATCH
@@ -162,8 +157,6 @@ model Organization {
   shippingInstructions ShippingInstruction[]
   billsOfLading        BillOfLading[]
   shippedOnBoards      ShippedOnBoard[]
-  inventoryItems       InventoryItem[]
-  inventoryMovements   InventoryMovement[]
   documents            Document[]
   notifications        Notification[]
   auditLogs            AuditLog[]
@@ -192,8 +185,6 @@ model User {
   createdSIs        ShippingInstruction[]  @relation("SICreatedBy")
   createdBLs        BillOfLading[]         @relation("BLCreatedBy")
   createdSobs       ShippedOnBoard[]       @relation("SobCreatedBy")
-  createdInventoryItems      InventoryItem[]      @relation("InventoryItemCreatedBy")
-  recordedInventoryMovements InventoryMovement[]  @relation("InventoryMovementRecordedBy")
   uploadedDocuments Document[]             @relation("DocumentUploadedBy")
   comments          BookingComment[]
   notifications     Notification[]
@@ -312,7 +303,6 @@ model Booking {
   shippingInstruction ShippingInstruction?
   billOfLading        BillOfLading?
   sob                 ShippedOnBoard?
-  inventoryMovements  InventoryMovement[]
   documents           Document[]
   comments            BookingComment[]
   timelineEvents      BookingTimelineEvent[]
@@ -679,63 +669,6 @@ model ShippedOnBoard {
 
   @@index([organizationId])
   @@map("shipped_on_boards")
-}
-
-// ---------------------------------------------------------------------------
-// Inventory — warehouse/godown stock exporters draw on when stuffing
-// containers. Deliberately not wired into the booking-stage machine: a
-// movement can *reference* a booking for traceability, but never drives
-// currentStage — that stays owned by SOB/stuffing/etc.
-// ---------------------------------------------------------------------------
-
-model InventoryItem {
-  id             String       @id @default(uuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  name         String
-  sku          String?
-  hsnCode      String?
-  category     String?
-  unit         String
-  currentStock Decimal  @default(0) @db.Decimal(14, 3)
-  reorderLevel Decimal? @db.Decimal(14, 3)
-  unitValue    Decimal? @db.Decimal(14, 2)
-  location     String?
-  notes        String?
-
-  createdById String?
-  createdBy   User?    @relation("InventoryItemCreatedBy", fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  movements InventoryMovement[]
-
-  @@index([organizationId])
-  @@map("inventory_items")
-}
-
-model InventoryMovement {
-  id             String       @id @default(uuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  itemId         String
-  item           InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-
-  type     InventoryMovementType
-  quantity Decimal               @db.Decimal(14, 3)
-  reason   String?
-
-  bookingId String?
-  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-
-  recordedById String?
-  recordedBy   User?    @relation("InventoryMovementRecordedBy", fields: [recordedById], references: [id])
-  createdAt    DateTime @default(now())
-
-  @@index([organizationId])
-  @@index([itemId])
-  @@map("inventory_movements")
 }
 
 // ---------------------------------------------------------------------------

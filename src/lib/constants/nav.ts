@@ -9,7 +9,6 @@ import {
   Send,
   Anchor,
   Boxes,
-  Warehouse,
   FolderOpen,
   Users,
   BarChart3,
@@ -147,13 +146,6 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Container,
         moduleKey: "stuffing",
         tone: "teal",
-      },
-      {
-        title: "Inventory",
-        href: "/inventory",
-        icon: Warehouse,
-        moduleKey: "inventory",
-        tone: "amber",
       },
       {
         title: "Gate In",
