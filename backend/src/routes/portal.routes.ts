@@ -44,6 +44,7 @@ router.get("/bookings", async (req, res, next) => {
       where: { customerId: req.customer!.id },
       include: { invoice: true },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
     res.json(bookings);
   } catch (err) {
@@ -79,6 +80,7 @@ router.get("/invoices", async (req, res, next) => {
       where: { customerId: req.customer!.id },
       include: { booking: true },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
     res.json(invoices);
   } catch (err) {
@@ -92,6 +94,7 @@ router.get("/documents", async (req, res, next) => {
       where: { booking: { customerId: req.customer!.id } },
       include: { booking: { select: { bookingNumber: true } } },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
     res.json(documents);
   } catch (err) {

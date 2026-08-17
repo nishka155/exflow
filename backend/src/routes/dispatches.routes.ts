@@ -21,6 +21,7 @@ router.get("/", async (req, res, next) => {
       where: { organizationId: req.user!.organizationId },
       include: { booking: { include: { customer: true } }, transporter: true },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
     res.json(dispatches);
   } catch (err) {
