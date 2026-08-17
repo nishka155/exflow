@@ -16,4 +16,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping /health
-        run: curl -fsS --max-time 60 https://exflow-1.onrender.com/health
+        run: curl -fsS --max-time 60 https://exflow-backend-3xb2.onrender.com/health
