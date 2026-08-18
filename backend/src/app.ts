@@ -26,6 +26,11 @@ import { errorHandler } from "./middleware/error-handler";
 export function createApp() {
   const app = express();
 
+  // Render puts one reverse proxy in front of the app — trust exactly that
+  // one hop so req.ip (and therefore rate-limit keys) reflect the real
+  // client IP from X-Forwarded-For instead of Render's proxy IP.
+  app.set("trust proxy", 1);
+
   app.use(helmet());
   app.use(
     cors({

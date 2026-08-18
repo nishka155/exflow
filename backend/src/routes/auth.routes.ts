@@ -14,6 +14,7 @@ import {
 } from "../lib/validations/auth";
 import { HttpError } from "../middleware/error-handler";
 import { requireAuth } from "../middleware/require-auth";
+import { loginRateLimit, signupRateLimit, forgotPasswordRateLimit } from "../middleware/rate-limit";
 
 const router = Router();
 
@@ -35,7 +36,7 @@ function publicUser(user: { id: string; organizationId: string; email: string; n
   };
 }
 
-router.post("/signup", async (req, res, next) => {
+router.post("/signup", signupRateLimit, async (req, res, next) => {
   try {
     const parsed = signUpSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -85,7 +86,7 @@ router.post("/signup", async (req, res, next) => {
   }
 });
 
-router.post("/login", async (req, res, next) => {
+router.post("/login", loginRateLimit, async (req, res, next) => {
   try {
     const parsed = signInSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -109,7 +110,7 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
-router.post("/forgot-password", async (req, res, next) => {
+router.post("/forgot-password", forgotPasswordRateLimit, async (req, res, next) => {
   try {
     const parsed = forgotPasswordSchema.safeParse(req.body);
     if (!parsed.success) {
