@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api/client";
+
+const COMMON_UNITS = ["KG", "MT", "PCS", "CTN", "BOX", "BAG", "LTR", "MTR", "SET", "ROLL"];
 
 interface InventoryItemRecord {
   id: string;
@@ -21,6 +23,8 @@ interface InventoryItemRecord {
   reorderLevel: string | null;
   unitValue: string | null;
   location: string | null;
+  supplier: string | null;
+  supplierContact: string | null;
   notes: string | null;
 }
 
@@ -28,6 +32,13 @@ export function InventoryItemForm({ item }: { item?: InventoryItemRecord }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [error, setError] = React.useState<string | null>(null);
+  const [unit, setUnit] = React.useState(item?.unit ?? "");
+  const [category, setCategory] = React.useState(item?.category ?? "");
+
+  const { data: categories } = useQuery({
+    queryKey: ["inventory-categories"],
+    queryFn: () => api.get<string[]>("/api/inventory/categories"),
+  });
 
   const mutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => {
@@ -36,6 +47,7 @@ export function InventoryItemForm({ item }: { item?: InventoryItemRecord }) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-categories"] });
       router.push(`/inventory/${data.id}`);
     },
     onError: (err) => {
@@ -46,26 +58,31 @@ export function InventoryItemForm({ item }: { item?: InventoryItemRecord }) {
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    const formData = new FormData(e.currentTarget);
+    const fd = new FormData(e.currentTarget);
     mutation.mutate({
-      name: formData.get("name"),
-      sku: formData.get("sku") || undefined,
-      hsnCode: formData.get("hsnCode") || undefined,
-      category: formData.get("category") || undefined,
-      unit: formData.get("unit"),
-      reorderLevel: formData.get("reorderLevel") || undefined,
-      unitValue: formData.get("unitValue") || undefined,
-      location: formData.get("location") || undefined,
-      notes: formData.get("notes") || undefined,
+      name: fd.get("name"),
+      sku: fd.get("sku") || undefined,
+      hsnCode: fd.get("hsnCode") || undefined,
+      category: category || undefined,
+      unit,
+      reorderLevel: fd.get("reorderLevel") || undefined,
+      unitValue: fd.get("unitValue") || undefined,
+      location: fd.get("location") || undefined,
+      supplier: fd.get("supplier") || undefined,
+      supplierContact: fd.get("supplierContact") || undefined,
+      notes: fd.get("notes") || undefined,
     });
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
-        <CardContent className="grid gap-4 sm:grid-cols-2 py-1">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Item Details</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="name">Item Name</Label>
+            <Label htmlFor="name">Item Name *</Label>
             <Input id="name" name="name" required defaultValue={item?.name} />
           </div>
           <div className="space-y-2">
@@ -81,19 +98,29 @@ export function InventoryItemForm({ item }: { item?: InventoryItemRecord }) {
             <Input
               id="category"
               name="category"
+              list="category-list"
               placeholder="e.g. Raw Material, Finished Goods"
-              defaultValue={item?.category ?? ""}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
             />
+            <datalist id="category-list">
+              {categories?.map((c) => <option key={c} value={c} />)}
+            </datalist>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="unit">Unit</Label>
+            <Label htmlFor="unit">Unit *</Label>
             <Input
               id="unit"
               name="unit"
+              list="unit-list"
               required
-              placeholder="e.g. KG, MT, PCS, CTN"
-              defaultValue={item?.unit ?? ""}
+              placeholder="KG, MT, PCS…"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
             />
+            <datalist id="unit-list">
+              {COMMON_UNITS.map((u) => <option key={u} value={u} />)}
+            </datalist>
           </div>
           <div className="space-y-2">
             <Label htmlFor="reorderLevel">Reorder Level</Label>
@@ -103,7 +130,7 @@ export function InventoryItemForm({ item }: { item?: InventoryItemRecord }) {
               type="number"
               step="0.001"
               min="0"
-              placeholder="Alert below this quantity"
+              placeholder={`Alert below this quantity (${unit || "unit"})`}
               defaultValue={item?.reorderLevel ?? ""}
             />
           </div>
@@ -122,10 +149,36 @@ export function InventoryItemForm({ item }: { item?: InventoryItemRecord }) {
             <Label htmlFor="location">Warehouse / Location</Label>
             <Input id="location" name="location" defaultValue={item?.location ?? ""} />
           </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" name="notes" defaultValue={item?.notes ?? ""} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Supplier</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="supplier">Supplier Name</Label>
+            <Input id="supplier" name="supplier" defaultValue={item?.supplier ?? ""} />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="supplierContact">Supplier Contact</Label>
+            <Input
+              id="supplierContact"
+              name="supplierContact"
+              placeholder="Phone, email, or contact name"
+              defaultValue={item?.supplierContact ?? ""}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Notes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Textarea id="notes" name="notes" defaultValue={item?.notes ?? ""} />
         </CardContent>
       </Card>
 

@@ -75,6 +75,10 @@ enum SobStatus {
 enum InventoryMovementType {
   IN
   OUT
+  RETURN
+  DAMAGED
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
 }
 
 enum BookingStage {
@@ -693,16 +697,18 @@ model InventoryItem {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  name         String
-  sku          String?
-  hsnCode      String?
-  category     String?
-  unit         String
-  currentStock Decimal  @default(0) @db.Decimal(14, 3)
-  reorderLevel Decimal? @db.Decimal(14, 3)
-  unitValue    Decimal? @db.Decimal(14, 2)
-  location     String?
-  notes        String?
+  name            String
+  sku             String?
+  hsnCode         String?
+  category        String?
+  unit            String
+  currentStock    Decimal  @default(0) @db.Decimal(14, 3)
+  reorderLevel    Decimal? @db.Decimal(14, 3)
+  unitValue       Decimal? @db.Decimal(14, 2)
+  location        String?
+  supplier        String?
+  supplierContact String?
+  notes           String?
 
   createdById String?
   createdBy   User?    @relation("InventoryItemCreatedBy", fields: [createdById], references: [id])
@@ -722,9 +728,11 @@ model InventoryMovement {
   itemId         String
   item           InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
-  type     InventoryMovementType
-  quantity Decimal               @db.Decimal(14, 3)
-  reason   String?
+  type            InventoryMovementType
+  quantity        Decimal @db.Decimal(14, 3)
+  runningBalance  Decimal @db.Decimal(14, 3)
+  referenceNumber String?
+  reason          String?
 
   bookingId String?
   booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)

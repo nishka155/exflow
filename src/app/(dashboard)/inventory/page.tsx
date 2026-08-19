@@ -3,7 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Warehouse, Loader2, AlertTriangle, Boxes, IndianRupee } from "lucide-react";
+import {
+  Plus, Warehouse, Loader2, AlertTriangle, Boxes, IndianRupee,
+  ChevronLeft, ChevronRight, Upload,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -12,14 +15,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { ClickableTableRow } from "@/components/shared/clickable-table-row";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api/client";
 
 interface InventoryListItem {
@@ -30,7 +37,16 @@ interface InventoryListItem {
   unit: string;
   currentStock: string;
   reorderLevel: string | null;
+  unitValue: string | null;
   location: string | null;
+  supplier: string | null;
+}
+
+interface InventoryListResponse {
+  items: InventoryListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 interface InventorySummary {
@@ -40,16 +56,33 @@ interface InventorySummary {
 }
 
 const numberFormat = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+const PAGE_SIZE = 50;
 
 function InventoryPageContent() {
   const [search, setSearch] = React.useState("");
+  const [debouncedSearch, setDebouncedSearch] = React.useState("");
+  const [category, setCategory] = React.useState("all");
+  const [lowStockOnly, setLowStockOnly] = React.useState(false);
+  const [page, setPage] = React.useState(1);
 
-  const { data: items, isLoading, error } = useQuery({
-    queryKey: ["inventory", { search }],
-    queryFn: () =>
-      api.get<InventoryListItem[]>(
-        `/api/inventory${search ? `?search=${encodeURIComponent(search)}` : ""}`
-      ),
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset page when filters change
+  React.useEffect(() => { setPage(1); }, [debouncedSearch, category, lowStockOnly]);
+
+  const params = new URLSearchParams();
+  if (debouncedSearch) params.set("search", debouncedSearch);
+  if (category !== "all") params.set("category", category);
+  if (lowStockOnly) params.set("lowStock", "true");
+  params.set("page", String(page));
+  params.set("pageSize", String(PAGE_SIZE));
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["inventory", { search: debouncedSearch, category, lowStockOnly, page }],
+    queryFn: () => api.get<InventoryListResponse>(`/api/inventory?${params}`),
   });
 
   const { data: summary } = useQuery({
@@ -57,16 +90,31 @@ function InventoryPageContent() {
     queryFn: () => api.get<InventorySummary>("/api/inventory/summary"),
   });
 
+  const { data: categories } = useQuery({
+    queryKey: ["inventory-categories"],
+    queryFn: () => api.get<string[]>("/api/inventory/categories"),
+  });
+
+  const items = data?.items ?? [];
+  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 1;
+  const hasFilters = debouncedSearch || category !== "all" || lowStockOnly;
+
   return (
     <div>
       <PageHeader
         title="Inventory"
         description="Warehouse stock exporters draw on when booking and stuffing containers."
         actions={
-          <Button nativeButton={false} render={<Link href="/inventory/new" />}>
-            <Plus />
-            New Item
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" nativeButton={false} render={<Link href="/inventory/import" />}>
+              <Upload className="size-4" />
+              Import
+            </Button>
+            <Button nativeButton={false} render={<Link href="/inventory/new" />}>
+              <Plus />
+              New Item
+            </Button>
+          </div>
         }
       />
 
@@ -80,18 +128,42 @@ function InventoryPageContent() {
         />
         <StatCard
           label="Total Stock Value"
-          value={summary ? numberFormat.format(summary.totalValue) : "—"}
+          value={summary ? `₹${numberFormat.format(summary.totalValue)}` : "—"}
           icon={IndianRupee}
         />
       </div>
 
-      <div className="mb-4">
+      {/* Filters */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <Input
-          placeholder="Search by name, SKU, or category…"
+          placeholder="Search by name, SKU, category, supplier…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
+          className="max-w-xs"
         />
+        {categories && categories.length > 0 && (
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="All categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <div className="flex items-center gap-2">
+          <Switch
+            id="lowStock"
+            checked={lowStockOnly}
+            onCheckedChange={setLowStockOnly}
+          />
+          <Label htmlFor="lowStock" className="cursor-pointer text-sm">
+            Low stock only
+          </Label>
+        </div>
       </div>
 
       {isLoading ? (
@@ -102,63 +174,102 @@ function InventoryPageContent() {
         <p className="py-16 text-center text-sm text-destructive">
           Could not load inventory. Please try again.
         </p>
-      ) : !items || items.length === 0 ? (
+      ) : items.length === 0 ? (
         <EmptyState
           icon={Warehouse}
-          title={search ? "No items match your search" : "No inventory items yet"}
+          title={hasFilters ? "No items match your filters" : "No inventory items yet"}
           description={
-            search
-              ? undefined
-              : "Add stock items to track what's available before you book and stuff a container."
+            !hasFilters
+              ? "Add stock items to track what's available before you book and stuff a container."
+              : undefined
           }
           action={
-            !search && (
+            !hasFilters ? (
               <Button nativeButton={false} render={<Link href="/inventory/new" />}>
                 <Plus />
                 New Item
               </Button>
-            )
+            ) : undefined
           }
         />
       ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead className="text-right">Current Stock</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => {
-                const isLow =
-                  item.reorderLevel != null &&
-                  Number(item.currentStock) <= Number(item.reorderLevel);
-                return (
-                  <ClickableTableRow key={item.id} href={`/inventory/${item.id}`}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>{item.sku ?? "—"}</TableCell>
-                    <TableCell>{item.category ?? "—"}</TableCell>
-                    <TableCell>{item.location ?? "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      <span className="inline-flex items-center gap-2">
-                        {item.currentStock} {item.unit}
-                        {isLow && (
-                          <Badge variant="outline" className="border-warning/40 text-warning">
-                            Low
-                          </Badge>
-                        )}
-                      </span>
-                    </TableCell>
-                  </ClickableTableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead className="text-right">Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item) => {
+                  const isLow =
+                    item.reorderLevel != null &&
+                    Number(item.currentStock) <= Number(item.reorderLevel);
+                  const stockValue =
+                    item.unitValue
+                      ? Number(item.currentStock) * Number(item.unitValue)
+                      : null;
+                  return (
+                    <ClickableTableRow key={item.id} href={`/inventory/${item.id}`}>
+                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{item.sku ?? "—"}</TableCell>
+                      <TableCell>{item.category ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{item.location ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{item.supplier ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        <span className="inline-flex items-center gap-2">
+                          {item.currentStock} {item.unit}
+                          {isLow && (
+                            <Badge variant="outline" className="border-warning/40 text-warning">
+                              Low
+                            </Badge>
+                          )}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {stockValue != null ? `₹${numberFormat.format(stockValue)}` : "—"}
+                      </TableCell>
+                    </ClickableTableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+              <span>
+                {data!.total} items · page {page} of {totalPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setPage((p) => p - 1)}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page >= totalPages}
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
