@@ -4,6 +4,7 @@ import { requireAuth } from "../middleware/require-auth";
 import { HttpError } from "../middleware/error-handler";
 import { bookingSchema } from "../lib/validations/booking";
 import { generateNextBookingNumber } from "../lib/booking-number";
+import { fetchAndCacheTracking } from "../lib/tracking/tracker";
 
 const router = Router();
 
@@ -119,6 +120,33 @@ router.post("/", async (req, res, next) => {
     });
 
     res.status(201).json(booking);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/:id/tracking", async (req, res, next) => {
+  try {
+    const booking = await prisma.booking.findFirst({
+      where: { id: req.params.id, organizationId: req.user!.organizationId },
+      select: { id: true },
+    });
+    if (!booking) throw new HttpError(404, "Booking not found");
+    const force = req.query.refresh === "1";
+    const result = await fetchAndCacheTracking(req.params.id, { force });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cache = await (prisma as any).trackingCache.findUnique({
+      where: { bookingId: req.params.id },
+      select: { fetchedAt: true },
+    });
+    res.json({
+      provider: result.provider,
+      events: result.events,
+      errorMessage: result.errorMessage,
+      summary: result.summary,
+      latestETA: result.latestETA,
+      fetchedAt: cache?.fetchedAt ?? new Date(),
+    });
   } catch (err) {
     next(err);
   }

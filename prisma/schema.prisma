@@ -171,6 +171,7 @@ model Organization {
   documents            Document[]
   notifications        Notification[]
   auditLogs            AuditLog[]
+  trackingCaches       TrackingCache[]
 
   @@map("organizations")
 }
@@ -320,6 +321,7 @@ model Booking {
   documents           Document[]
   comments            BookingComment[]
   timelineEvents      BookingTimelineEvent[]
+  trackingCache       TrackingCache?
 
   @@index([organizationId])
   @@index([customerId])
@@ -814,6 +816,28 @@ model Notification {
   @@index([organizationId])
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Live container tracking cache (one row per booking, TTL-based refresh)
+// ---------------------------------------------------------------------------
+
+model TrackingCache {
+  id             String       @id @default(cuid())
+  bookingId      String       @unique
+  booking        Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider       String // "MAERSK" | "EVERGREEN" | "AKKON" | "HMM" | "HAPAG" | "MSC" | "CMA" | "NONE"
+  events         Json // normalised TrackingEvent[]
+  rawResponse    Json?
+  errorMessage   String?
+  summary        String?
+  latestETA      String?
+  fetchedAt      DateTime @default(now())
+
+  @@index([fetchedAt])
+  @@map("tracking_caches")
 }
 
 // ---------------------------------------------------------------------------

@@ -34,6 +34,8 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DocumentList } from "@/components/shared/document-list";
 import { BookingComments } from "@/components/modules/booking-comments";
+import { TrackingEvents } from "@/components/modules/tracking-events";
+import { ExternalTrackingLinks } from "@/components/modules/external-tracking-links";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api/client";
 import {
@@ -59,6 +61,8 @@ interface BookingMaster {
   id: string;
   bookingNumber: string;
   currentStage: string;
+  vessel?: string | null;
+  shippingLine?: string | null;
   customer: Customer;
   invoice: Invoice | null;
   truckDispatches: (TruckDispatch & { transporter: Transporter })[];
@@ -217,6 +221,20 @@ function BookingMasterPageContent({ id }: { id: string }) {
           </Link>
         ))}
       </div>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Live Container Tracking</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <ExternalTrackingLinks
+            vesselName={booking.vessel}
+            shippingLine={booking.shippingLine}
+            bookingNumber={booking.bookingNumber}
+          />
+          <TrackingEvents bookingId={booking.id} />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
