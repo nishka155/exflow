@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { api, ApiError } from "@/lib/api/client";
+import { BarcodeDisplay } from "@/components/modules/barcode-display";
 
 type MovementType = "IN" | "OUT" | "RETURN" | "DAMAGED" | "ADJUSTMENT_IN" | "ADJUSTMENT_OUT";
 
@@ -55,6 +56,7 @@ interface ItemDetail {
   currentStock: string;
   reorderLevel: string | null;
   unitValue: string | null;
+  barcode: string | null;
   location: string | null;
   supplier: string | null;
   supplierContact: string | null;
@@ -222,6 +224,18 @@ function InventoryDetailPageContent() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Barcode card */}
+          {item.barcode && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Barcode</CardTitle>
+              </CardHeader>
+              <CardContent className="flex justify-center">
+                <BarcodeDisplay value={item.barcode} label={item.name} />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Analytics card */}
           <Card>

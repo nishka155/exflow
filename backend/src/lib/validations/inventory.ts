@@ -3,6 +3,7 @@ import { z } from "zod";
 export const inventoryItemSchema = z.object({
   name: z.string().min(1, "Item name is required"),
   sku: z.string().optional(),
+  barcode: z.string().optional(),
   hsnCode: z.string().optional(),
   category: z.string().optional(),
   unit: z.string().min(1, "Unit is required"),

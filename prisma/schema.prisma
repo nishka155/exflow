@@ -699,6 +699,7 @@ model InventoryItem {
 
   name            String
   sku             String?
+  barcode         String?  @unique
   hsnCode         String?
   category        String?
   unit            String

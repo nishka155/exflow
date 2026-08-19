@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
   Plus, Warehouse, Loader2, AlertTriangle, Boxes, IndianRupee,
-  ChevronLeft, ChevronRight, Upload,
+  ChevronLeft, ChevronRight, Upload, Scan,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
@@ -106,6 +106,10 @@ function InventoryPageContent() {
         description="Warehouse stock exporters draw on when booking and stuffing containers."
         actions={
           <div className="flex items-center gap-2">
+            <Button variant="outline" nativeButton={false} render={<Link href="/inventory/scan" />}>
+              <Scan className="size-4" />
+              Scan
+            </Button>
             <Button variant="outline" nativeButton={false} render={<Link href="/inventory/import" />}>
               <Upload className="size-4" />
               Import

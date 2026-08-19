@@ -40,6 +40,11 @@ export function InventoryItemForm({ item }: { item?: InventoryItemRecord }) {
     queryFn: () => api.get<string[]>("/api/inventory/categories"),
   });
 
+  function generateBarcode() {
+    // Simple auto-generate: timestamp + random suffix
+    return `INV-${Date.now().toString(36).toUpperCase()}`;
+  }
+
   const mutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => {
       if (item) return api.put<InventoryItemRecord>(`/api/inventory/${item.id}`, payload);
@@ -62,6 +67,7 @@ export function InventoryItemForm({ item }: { item?: InventoryItemRecord }) {
     mutation.mutate({
       name: fd.get("name"),
       sku: fd.get("sku") || undefined,
+      barcode: fd.get("barcode") || undefined,
       hsnCode: fd.get("hsnCode") || undefined,
       category: category || undefined,
       unit,
@@ -88,6 +94,28 @@ export function InventoryItemForm({ item }: { item?: InventoryItemRecord }) {
           <div className="space-y-2">
             <Label htmlFor="sku">SKU / Code</Label>
             <Input id="sku" name="sku" defaultValue={item?.sku ?? ""} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="barcode">Barcode</Label>
+            <div className="flex gap-2">
+              <Input
+                id="barcode"
+                name="barcode"
+                placeholder="Scan or type barcode"
+                defaultValue={item?.barcode ?? ""}
+                className="font-mono"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={(e) => {
+                  const input = (e.currentTarget.closest("div")!).querySelector("input") as HTMLInputElement;
+                  input.value = generateBarcode();
+                }}
+              >
+                Generate
+              </Button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="hsnCode">HSN Code</Label>

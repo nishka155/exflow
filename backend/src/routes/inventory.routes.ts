@@ -38,6 +38,7 @@ router.get("/", async (req, res, next) => {
             OR: [
               { name: { contains: search, mode: "insensitive" as const } },
               { sku: { contains: search, mode: "insensitive" as const } },
+              { barcode: { contains: search, mode: "insensitive" as const } },
               { category: { contains: search, mode: "insensitive" as const } },
               { supplier: { contains: search, mode: "insensitive" as const } },
             ],
@@ -160,6 +161,34 @@ router.post("/bulk-import", async (req, res, next) => {
     }
 
     res.status(201).json({ created, errors });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── Barcode lookup ────────────────────────────────────────────────────
+router.get("/barcode/:code", async (req, res, next) => {
+  try {
+    const item = await prisma.inventoryItem.findFirst({
+      where: {
+        organizationId: req.user!.organizationId,
+        barcode: req.params.code,
+      },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        barcode: true,
+        category: true,
+        unit: true,
+        currentStock: true,
+        reorderLevel: true,
+        unitValue: true,
+        location: true,
+      },
+    });
+    if (!item) throw new HttpError(404, "No item found for this barcode");
+    res.json(item);
   } catch (err) {
     next(err);
   }
